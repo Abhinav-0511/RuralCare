@@ -1,0 +1,37 @@
+{
+  "notes": "Golden test cases for the red-flag rule engine. BOTH the TypeScript engine (shared/src) and the Python engine (ai-service/app/safety) must pass every case. matchedRuleIds is compared as a set.",
+  "cases": [
+    { "name": "chest pain", "input": { "symptoms": ["chest_pain"] }, "expected": { "isEmergency": true, "matchedRuleIds": ["RF_CHEST_PAIN"] } },
+    { "name": "difficulty breathing", "input": { "symptoms": ["breathlessness"] }, "expected": { "isEmergency": true, "matchedRuleIds": ["RF_BREATHING"] } },
+    { "name": "unconscious", "input": { "symptoms": ["unconscious"] }, "expected": { "isEmergency": true, "matchedRuleIds": ["RF_UNCONSCIOUS"] } },
+    { "name": "severe bleeding", "input": { "symptoms": ["severe_bleeding"] }, "expected": { "isEmergency": true, "matchedRuleIds": ["RF_SEVERE_BLEEDING"] } },
+    { "name": "vomiting blood", "input": { "symptoms": ["vomiting_blood"] }, "expected": { "isEmergency": true, "matchedRuleIds": ["RF_SEVERE_BLEEDING"] } },
+    { "name": "stroke: face drooping alone", "input": { "symptoms": ["face_drooping"] }, "expected": { "isEmergency": true, "matchedRuleIds": ["RF_STROKE_SIGNS"] } },
+    { "name": "stroke: one-sided weakness", "input": { "symptoms": ["weakness_of_one_body_side"] }, "expected": { "isEmergency": true, "matchedRuleIds": ["RF_STROKE_SIGNS"] } },
+    { "name": "stroke: slurred speech", "input": { "symptoms": ["slurred_speech", "headache"] }, "expected": { "isEmergency": true, "matchedRuleIds": ["RF_STROKE_SIGNS"] } },
+    { "name": "seizure", "input": { "symptoms": ["seizure"] }, "expected": { "isEmergency": true, "matchedRuleIds": ["RF_SEIZURE"] } },
+
+    { "name": "mild fever, 2-month-old", "input": { "symptoms": ["mild_fever"], "ageMonths": 2 }, "expected": { "isEmergency": true, "matchedRuleIds": ["RF_FEVER_YOUNG_INFANT"] } },
+    { "name": "measured 38.2C, 1-month-old, no symptoms ticked", "input": { "symptoms": [], "ageMonths": 1, "temperatureC": 38.2 }, "expected": { "isEmergency": true, "matchedRuleIds": ["RF_FEVER_YOUNG_INFANT"] } },
+    { "name": "boundary: exactly 38.0C, 2-month-old", "input": { "symptoms": [], "ageMonths": 2, "temperatureC": 38.0 }, "expected": { "isEmergency": true, "matchedRuleIds": ["RF_FEVER_YOUNG_INFANT"] } },
+    { "name": "high fever, 2-month-old matches both infant rules", "input": { "symptoms": ["high_fever"], "ageMonths": 2 }, "expected": { "isEmergency": true, "matchedRuleIds": ["RF_FEVER_YOUNG_INFANT", "RF_HIGH_FEVER_INFANT"] } },
+    { "name": "high fever, 8-month-old", "input": { "symptoms": ["high_fever"], "ageMonths": 8 }, "expected": { "isEmergency": true, "matchedRuleIds": ["RF_HIGH_FEVER_INFANT"] } },
+    { "name": "measured 39.5C, 10-month-old", "input": { "symptoms": [], "ageMonths": 10, "temperatureC": 39.5 }, "expected": { "isEmergency": true, "matchedRuleIds": ["RF_HIGH_FEVER_INFANT"] } },
+    { "name": "boundary: 3-month-old with mild fever is not a young infant", "input": { "symptoms": ["mild_fever"], "ageMonths": 3 }, "expected": { "isEmergency": false, "matchedRuleIds": [] } },
+    { "name": "mild fever 38.5C, 8-month-old", "input": { "symptoms": ["mild_fever"], "ageMonths": 8, "temperatureC": 38.5 }, "expected": { "isEmergency": false, "matchedRuleIds": [] } },
+    { "name": "boundary: high fever at exactly 12 months", "input": { "symptoms": ["high_fever"], "ageMonths": 12 }, "expected": { "isEmergency": false, "matchedRuleIds": [] } },
+    { "name": "high fever, adult", "input": { "symptoms": ["high_fever", "headache"], "ageMonths": 360 }, "expected": { "isEmergency": false, "matchedRuleIds": [] } },
+    { "name": "high fever, age unknown", "input": { "symptoms": ["high_fever"] }, "expected": { "isEmergency": false, "matchedRuleIds": [] } },
+
+    { "name": "pregnant with vaginal bleeding", "input": { "symptoms": ["vaginal_bleeding"], "pregnant": true }, "expected": { "isEmergency": true, "matchedRuleIds": ["RF_PREGNANCY_BLEEDING"] } },
+    { "name": "vaginal bleeding, not pregnant", "input": { "symptoms": ["vaginal_bleeding"], "pregnant": false }, "expected": { "isEmergency": false, "matchedRuleIds": [] } },
+    { "name": "vaginal bleeding, pregnancy unknown", "input": { "symptoms": ["vaginal_bleeding"] }, "expected": { "isEmergency": false, "matchedRuleIds": [] } },
+    { "name": "pregnant with severe bleeding matches two rules", "input": { "symptoms": ["severe_bleeding"], "pregnant": true }, "expected": { "isEmergency": true, "matchedRuleIds": ["RF_SEVERE_BLEEDING", "RF_PREGNANCY_BLEEDING"] } },
+
+    { "name": "several red flags at once", "input": { "symptoms": ["chest_pain", "breathlessness", "sweating"] }, "expected": { "isEmergency": true, "matchedRuleIds": ["RF_CHEST_PAIN", "RF_BREATHING"] } },
+    { "name": "common cold", "input": { "symptoms": ["cough", "runny_nose", "continuous_sneezing"], "ageMonths": 300 }, "expected": { "isEmergency": false, "matchedRuleIds": [] } },
+    { "name": "no symptoms", "input": { "symptoms": [] }, "expected": { "isEmergency": false, "matchedRuleIds": [] } },
+    { "name": "input is normalised (case + whitespace)", "input": { "symptoms": ["  Chest_Pain "] }, "expected": { "isEmergency": true, "matchedRuleIds": ["RF_CHEST_PAIN"] } },
+    { "name": "unknown symptoms are ignored and reported", "input": { "symptoms": ["flying", "headache"] }, "expected": { "isEmergency": false, "matchedRuleIds": [], "unknownSymptoms": ["flying"] } }
+  ]
+}

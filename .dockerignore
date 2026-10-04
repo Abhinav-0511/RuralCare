@@ -1,0 +1,14 @@
+# Docker builds use the repo root as context so images can include /shared
+**/node_modules
+**/dist
+**/coverage
+**/.env
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+.git
+.github
+docs
+infra
+edge

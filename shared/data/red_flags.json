@@ -1,0 +1,63 @@
+{
+  "version": "1.0.0",
+  "notes": "Deterministic red-flag rules. Evaluated BEFORE the ML model on every path (client offline, server, ai-service). Any match => EMERGENCY and the model is never called. Each condition object has exactly one key. Leaf conditions: anySymptoms, allSymptoms, ageMonthsLt, ageMonthsGte, pregnant, temperatureCGte. Combinators: all, any. A condition on a missing context value (e.g. age not given) evaluates to false. Thresholds are based on common public guidance and are NOT clinically validated.",
+  "rules": [
+    {
+      "id": "RF_CHEST_PAIN",
+      "label": { "en": "Chest pain", "ta": "மார்பு வலி", "hi": "सीने में दर्द" },
+      "when": { "anySymptoms": ["chest_pain"] }
+    },
+    {
+      "id": "RF_BREATHING",
+      "label": { "en": "Difficulty breathing", "ta": "மூச்சுத் திணறல்", "hi": "सांस लेने में तकलीफ" },
+      "when": { "anySymptoms": ["breathlessness"] }
+    },
+    {
+      "id": "RF_UNCONSCIOUS",
+      "label": { "en": "Unconscious or not responding", "ta": "சுயநினைவு இல்லை அல்லது பதிலளிக்கவில்லை", "hi": "बेहोशी या कोई प्रतिक्रिया नहीं" },
+      "when": { "anySymptoms": ["unconscious"] }
+    },
+    {
+      "id": "RF_SEVERE_BLEEDING",
+      "label": { "en": "Severe bleeding", "ta": "கடுமையான இரத்தப்போக்கு", "hi": "बहुत ज़्यादा खून बहना" },
+      "when": { "anySymptoms": ["severe_bleeding", "vomiting_blood"] }
+    },
+    {
+      "id": "RF_STROKE_SIGNS",
+      "label": { "en": "Possible stroke signs (face, arm, speech)", "ta": "பக்கவாத அறிகுறிகள் (முகம், கை, பேச்சு)", "hi": "लकवे (स्ट्रोक) के संकेत (चेहरा, बांह, बोली)" },
+      "when": { "anySymptoms": ["face_drooping", "weakness_of_one_body_side", "slurred_speech"] }
+    },
+    {
+      "id": "RF_SEIZURE",
+      "label": { "en": "Seizure / fits", "ta": "வலிப்பு", "hi": "दौरा / झटके" },
+      "when": { "anySymptoms": ["seizure"] }
+    },
+    {
+      "id": "RF_FEVER_YOUNG_INFANT",
+      "label": { "en": "Fever in a baby under 3 months", "ta": "3 மாதத்திற்குட்பட்ட குழந்தைக்கு காய்ச்சல்", "hi": "3 महीने से छोटे शिशु को बुखार" },
+      "when": {
+        "all": [
+          { "ageMonthsLt": 3 },
+          { "any": [{ "anySymptoms": ["mild_fever", "high_fever"] }, { "temperatureCGte": 38 }] }
+        ]
+      }
+    },
+    {
+      "id": "RF_HIGH_FEVER_INFANT",
+      "label": { "en": "High fever in a baby under 1 year", "ta": "1 வயதுக்குட்பட்ட குழந்தைக்கு அதிக காய்ச்சல்", "hi": "1 साल से छोटे शिशु को तेज़ बुखार" },
+      "when": {
+        "all": [
+          { "ageMonthsLt": 12 },
+          { "any": [{ "anySymptoms": ["high_fever"] }, { "temperatureCGte": 39 }] }
+        ]
+      }
+    },
+    {
+      "id": "RF_PREGNANCY_BLEEDING",
+      "label": { "en": "Bleeding during pregnancy", "ta": "கர்ப்ப காலத்தில் இரத்தப்போக்கு", "hi": "गर्भावस्था में खून आना" },
+      "when": {
+        "all": [{ "pregnant": true }, { "anySymptoms": ["vaginal_bleeding", "severe_bleeding"] }]
+      }
+    }
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "version": "1.0.0",
+  "emergencyNumber": "108",
+  "disclaimer": {
+    "en": "This is triage guidance, not a medical diagnosis. It does not replace a doctor. If you feel worse or are worried, seek medical care.",
+    "ta": "இது முதற்கட்ட வழிகாட்டுதல் மட்டுமே, மருத்துவ நோயறிதல் அல்ல. இது மருத்துவருக்கு மாற்றாகாது. உடல்நிலை மோசமானால் அல்லது கவலையாக இருந்தால், மருத்துவ உதவியை நாடுங்கள்.",
+    "hi": "यह केवल प्रारंभिक मार्गदर्शन है, चिकित्सकीय निदान नहीं। यह डॉक्टर का विकल्प नहीं है। तबीयत बिगड़े या चिंता हो तो चिकित्सा सहायता लें।"
+  },
+  "levels": [
+    {
+      "id": "EMERGENCY",
+      "severity": 4,
+      "color": "#B91C1C",
+      "decidedBy": "rule_engine",
+      "title": {
+        "en": "EMERGENCY — call 108 / go to the nearest hospital now",
+        "ta": "அவசரம் — 108-ஐ அழைக்கவும் / உடனே அருகிலுள்ள மருத்துவமனைக்குச் செல்லவும்",
+        "hi": "आपातकाल — 108 पर कॉल करें / तुरंत नज़दीकी अस्पताल जाएं"
+      },
+      "advice": {
+        "en": "Do not wait. Call 108 for an ambulance or go to the nearest hospital immediately.",
+        "ta": "காத்திருக்க வேண்டாம். ஆம்புலன்ஸுக்கு 108-ஐ அழைக்கவும் அல்லது உடனடியாக அருகிலுள்ள மருத்துவமனைக்குச் செல்லவும்.",
+        "hi": "इंतज़ार न करें। एम्बुलेंस के लिए 108 पर कॉल करें या तुरंत नज़दीकी अस्पताल जाएं।"
+      }
+    },
+    {
+      "id": "SEE_DOCTOR_24H",
+      "severity": 3,
+      "color": "#C2410C",
+      "decidedBy": "model",
+      "title": {
+        "en": "See a doctor within 24 hours",
+        "ta": "24 மணி நேரத்திற்குள் மருத்துவரைப் பாருங்கள்",
+        "hi": "24 घंटे के अंदर डॉक्टर को दिखाएं"
+      },
+      "advice": {
+        "en": "Visit a doctor or primary health centre (PHC) within 24 hours. Go sooner if symptoms get worse.",
+        "ta": "24 மணி நேரத்திற்குள் மருத்துவர் அல்லது ஆரம்ப சுகாதார நிலையத்திற்கு (PHC) செல்லுங்கள். அறிகுறிகள் மோசமானால் உடனே செல்லுங்கள்.",
+        "hi": "24 घंटे के अंदर डॉक्टर या प्राथमिक स्वास्थ्य केंद्र (PHC) जाएं। लक्षण बढ़ें तो और जल्दी जाएं।"
+      }
+    },
+    {
+      "id": "SEE_DOCTOR_SOON",
+      "severity": 2,
+      "color": "#A16207",
+      "decidedBy": "model",
+      "title": {
+        "en": "See a doctor in the next few days",
+        "ta": "அடுத்த சில நாட்களில் மருத்துவரைப் பாருங்கள்",
+        "hi": "अगले कुछ दिनों में डॉक्टर को दिखाएं"
+      },
+      "advice": {
+        "en": "Book a visit with a doctor or health worker in the next 2–3 days. Go sooner if symptoms get worse.",
+        "ta": "அடுத்த 2–3 நாட்களில் மருத்துவர் அல்லது சுகாதார பணியாளரைச் சந்தியுங்கள். அறிகுறிகள் மோசமானால் உடனே செல்லுங்கள்.",
+        "hi": "अगले 2–3 दिनों में डॉक्टर या स्वास्थ्य कार्यकर्ता से मिलें। लक्षण बढ़ें तो और जल्दी जाएं।"
+      }
+    },
+    {
+      "id": "SELF_CARE",
+      "severity": 1,
+      "color": "#15803D",
+      "decidedBy": "model",
+      "title": {
+        "en": "Self-care at home",
+        "ta": "வீட்டிலேயே சுய பராமரிப்பு",
+        "hi": "घर पर देखभाल"
+      },
+      "advice": {
+        "en": "Rest, drink plenty of clean water and watch your symptoms. See a doctor if they last more than 3 days or get worse.",
+        "ta": "ஓய்வெடுங்கள், சுத்தமான தண்ணீர் நிறைய குடியுங்கள், அறிகுறிகளைக் கவனியுங்கள். 3 நாட்களுக்கு மேல் நீடித்தால் அல்லது மோசமானால் மருத்துவரைப் பாருங்கள்.",
+        "hi": "आराम करें, खूब साफ़ पानी पिएं और लक्षणों पर नज़र रखें। 3 दिन से ज़्यादा रहें या बढ़ें तो डॉक्टर को दिखाएं।"
+      }
+    }
+  ]
+}

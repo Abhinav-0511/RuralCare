@@ -1,4 +1,4 @@
-# GramHealth — local stack
+# RuralCare — local stack
 # Usage (from repo root):
 #   docker compose -f infra/docker-compose.yml up -d mongodb timescaledb mosquitto   # infra only
 #   docker compose -f infra/docker-compose.yml up --build                            # everything
@@ -7,7 +7,7 @@
 # The app services also load their own <service>/.env. Hostnames are overridden below so they
 # point at compose service names instead of localhost.
 
-name: gramhealth
+name: ruralcare
 
 services:
   # ───────────────────────────── Data stores ─────────────────────────────
@@ -19,11 +19,11 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
       MONGO_INITDB_DATABASE: ${MONGO_DB}
     ports:
-      - "${MONGO_PORT:-27017}:27017"
+      - '${MONGO_PORT:-27017}:27017'
     volumes:
       - mongo-data:/data/db
     healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      test: ['CMD', 'mongosh', '--quiet', '--eval', "db.adminCommand('ping').ok"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -36,11 +36,11 @@ services:
       POSTGRES_PASSWORD: ${TSDB_PASSWORD}
       POSTGRES_DB: ${TSDB_DB}
     ports:
-      - "${TSDB_PORT:-5433}:5432"
+      - '${TSDB_PORT:-5433}:5432'
     volumes:
       - tsdb-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${TSDB_USER} -d ${TSDB_DB}"]
+      test: ['CMD-SHELL', 'pg_isready -U ${TSDB_USER} -d ${TSDB_DB}']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -50,14 +50,14 @@ services:
     image: eclipse-mosquitto:2
     restart: unless-stopped
     ports:
-      - "${MQTT_PORT:-1883}:1883"
-      - "${MQTT_WS_PORT:-9001}:9001"
+      - '${MQTT_PORT:-1883}:1883'
+      - '${MQTT_WS_PORT:-9001}:9001'
     volumes:
       - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - mosquitto-data:/mosquitto/data
       - mosquitto-log:/mosquitto/log
     healthcheck:
-      test: ["CMD", "mosquitto_sub", "-t", "$$SYS/broker/uptime", "-C", "1", "-W", "3"]
+      test: ['CMD', 'mosquitto_sub', '-t', '$$SYS/broker/uptime', '-C', '1', '-W', '3']
       interval: 15s
       timeout: 5s
       retries: 5
@@ -65,20 +65,30 @@ services:
   # ───────────────────────────── Application ─────────────────────────────
   ai-service:
     build:
-      context: ../ai-service
+      # Repo root as context so the image can include /shared
+      context: ..
+      dockerfile: ai-service/Dockerfile
     restart: unless-stopped
     env_file: ../ai-service/.env
     ports:
-      - "${AI_PORT:-8000}:8000"
+      - '${AI_PORT:-8000}:8000'
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')",
+        ]
       interval: 15s
       timeout: 5s
       retries: 5
 
   server:
     build:
-      context: ../server
+      # Repo root as context so the image can include /shared
+      context: ..
+      dockerfile: server/Dockerfile
     restart: unless-stopped
     env_file: ../server/.env
     environment:
@@ -88,7 +98,7 @@ services:
       MQTT_URL: mqtt://mosquitto:1883
       AI_SERVICE_URL: http://ai-service:8000
     ports:
-      - "${SERVER_PORT:-4000}:4000"
+      - '${SERVER_PORT:-4000}:4000'
     depends_on:
       mongodb:
         condition: service_healthy
@@ -97,19 +107,33 @@ services:
       mosquitto:
         condition: service_healthy
       ai-service:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://localhost:4000/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
 
   client:
     build:
-      context: ../client
+      # Repo root as context so the image can include /shared
+      context: ..
+      dockerfile: client/Dockerfile
       args:
         # Vite env vars are baked in at build time
         VITE_API_URL: ${CLIENT_API_URL:-http://localhost:4000}
     restart: unless-stopped
     ports:
-      - "${CLIENT_PORT:-8080}:80"
+      - '${CLIENT_PORT:-8080}:80'
     depends_on:
-      - server
+      server:
+        condition: service_healthy
 
   # ───────────────────────────── Edge (Phase 4) ─────────────────────────────
   # edge-simulator:

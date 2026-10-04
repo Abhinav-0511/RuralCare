@@ -1,0 +1,51 @@
+{
+  "version": "1.0.0",
+  "notes": "Symptom vocabulary shared by client, server and ai-service. IDs use the same snake_case names as the Kaggle 'Disease Symptom Prediction' dataset where they overlap (e.g. chest_pain, breathlessness, high_fever) so they map directly to model features. Phase 3 extends this list with the remaining dataset symptoms.",
+  "categories": ["emergency", "general", "respiratory", "digestive", "pain", "skin", "urinary", "neuro", "pregnancy"],
+  "symptoms": [
+    { "id": "chest_pain", "category": "emergency", "label": { "en": "Chest pain", "ta": "மார்பு வலி", "hi": "सीने में दर्द" } },
+    { "id": "breathlessness", "category": "emergency", "label": { "en": "Difficulty breathing", "ta": "மூச்சு விடுவதில் சிரமம்", "hi": "सांस लेने में तकलीफ" } },
+    { "id": "unconscious", "category": "emergency", "label": { "en": "Unconscious / not responding", "ta": "சுயநினைவு இல்லை / பதில் இல்லை", "hi": "बेहोशी / कोई प्रतिक्रिया नहीं" } },
+    { "id": "severe_bleeding", "category": "emergency", "label": { "en": "Severe bleeding", "ta": "கடுமையான இரத்தப்போக்கு", "hi": "बहुत ज़्यादा खून बहना" } },
+    { "id": "vomiting_blood", "category": "emergency", "label": { "en": "Vomiting blood", "ta": "இரத்த வாந்தி", "hi": "खून की उल्टी" } },
+    { "id": "face_drooping", "category": "neuro", "label": { "en": "Face drooping on one side", "ta": "முகம் ஒரு பக்கம் தொங்குதல்", "hi": "चेहरे का एक तरफ लटकना" } },
+    { "id": "weakness_of_one_body_side", "category": "neuro", "label": { "en": "Weakness on one side of the body", "ta": "உடலின் ஒரு பக்கம் பலவீனம்", "hi": "शरीर के एक तरफ कमज़ोरी" } },
+    { "id": "slurred_speech", "category": "neuro", "label": { "en": "Slurred or unclear speech", "ta": "குழறிய பேச்சு", "hi": "बोलने में लड़खड़ाहट" } },
+    { "id": "seizure", "category": "neuro", "label": { "en": "Seizure / fits", "ta": "வலிப்பு", "hi": "दौरा / झटके आना" } },
+    { "id": "vaginal_bleeding", "category": "pregnancy", "label": { "en": "Vaginal bleeding", "ta": "பிறப்புறுப்பில் இரத்தப்போக்கு", "hi": "योनि से खून आना" } },
+
+    { "id": "high_fever", "category": "general", "label": { "en": "High fever", "ta": "அதிக காய்ச்சல்", "hi": "तेज़ बुखार" } },
+    { "id": "mild_fever", "category": "general", "label": { "en": "Mild fever", "ta": "லேசான காய்ச்சல்", "hi": "हल्का बुखार" } },
+    { "id": "chills", "category": "general", "label": { "en": "Chills / shivering", "ta": "குளிர் நடுக்கம்", "hi": "ठंड लगना / कंपकंपी" } },
+    { "id": "fatigue", "category": "general", "label": { "en": "Tiredness", "ta": "சோர்வு", "hi": "थकान" } },
+    { "id": "sweating", "category": "general", "label": { "en": "Sweating", "ta": "வியர்வை", "hi": "पसीना आना" } },
+    { "id": "dizziness", "category": "general", "label": { "en": "Dizziness", "ta": "தலைச்சுற்றல்", "hi": "चक्कर आना" } },
+    { "id": "loss_of_appetite", "category": "general", "label": { "en": "Loss of appetite", "ta": "பசியின்மை", "hi": "भूख न लगना" } },
+    { "id": "weight_loss", "category": "general", "label": { "en": "Weight loss", "ta": "எடை இழப்பு", "hi": "वज़न घटना" } },
+    { "id": "dehydration", "category": "general", "label": { "en": "Dehydration", "ta": "நீர்ச்சத்து குறைபாடு", "hi": "पानी की कमी (डिहाइड्रेशन)" } },
+
+    { "id": "cough", "category": "respiratory", "label": { "en": "Cough", "ta": "இருமல்", "hi": "खांसी" } },
+    { "id": "runny_nose", "category": "respiratory", "label": { "en": "Runny nose", "ta": "மூக்கு ஒழுகுதல்", "hi": "नाक बहना" } },
+    { "id": "continuous_sneezing", "category": "respiratory", "label": { "en": "Continuous sneezing", "ta": "தொடர் தும்மல்", "hi": "लगातार छींक आना" } },
+    { "id": "throat_irritation", "category": "respiratory", "label": { "en": "Sore / irritated throat", "ta": "தொண்டை எரிச்சல்", "hi": "गले में खराश" } },
+
+    { "id": "nausea", "category": "digestive", "label": { "en": "Nausea", "ta": "குமட்டல்", "hi": "जी मिचलाना" } },
+    { "id": "vomiting", "category": "digestive", "label": { "en": "Vomiting", "ta": "வாந்தி", "hi": "उल्टी" } },
+    { "id": "diarrhoea", "category": "digestive", "label": { "en": "Diarrhoea", "ta": "வயிற்றுப்போக்கு", "hi": "दस्त" } },
+    { "id": "constipation", "category": "digestive", "label": { "en": "Constipation", "ta": "மலச்சிக்கல்", "hi": "कब्ज" } },
+    { "id": "abdominal_pain", "category": "digestive", "label": { "en": "Abdominal pain", "ta": "வயிற்று வலி", "hi": "पेट दर्द" } },
+    { "id": "stomach_pain", "category": "digestive", "label": { "en": "Upper stomach pain", "ta": "மேல் வயிற்று வலி", "hi": "पेट के ऊपरी हिस्से में दर्द" } },
+
+    { "id": "headache", "category": "pain", "label": { "en": "Headache", "ta": "தலைவலி", "hi": "सिरदर्द" } },
+    { "id": "back_pain", "category": "pain", "label": { "en": "Back pain", "ta": "முதுகு வலி", "hi": "पीठ दर्द" } },
+    { "id": "joint_pain", "category": "pain", "label": { "en": "Joint pain", "ta": "மூட்டு வலி", "hi": "जोड़ों में दर्द" } },
+    { "id": "muscle_pain", "category": "pain", "label": { "en": "Muscle pain", "ta": "தசை வலி", "hi": "मांसपेशियों में दर्द" } },
+
+    { "id": "skin_rash", "category": "skin", "label": { "en": "Skin rash", "ta": "தோல் தடிப்பு", "hi": "त्वचा पर चकत्ते" } },
+    { "id": "itching", "category": "skin", "label": { "en": "Itching", "ta": "அரிப்பு", "hi": "खुजली" } },
+    { "id": "yellowish_skin", "category": "skin", "label": { "en": "Yellowish skin", "ta": "தோல் மஞ்சளாதல்", "hi": "त्वचा का पीला पड़ना" } },
+
+    { "id": "burning_micturition", "category": "urinary", "label": { "en": "Burning while urinating", "ta": "சிறுநீர் கழிக்கும்போது எரிச்சல்", "hi": "पेशाब में जलन" } },
+    { "id": "dark_urine", "category": "urinary", "label": { "en": "Dark urine", "ta": "அடர் நிற சிறுநீர்", "hi": "गहरे रंग का पेशाब" } }
+  ]
+}

@@ -1,0 +1,9 @@
+node_modules
+dist
+coverage
+package-lock.json
+ai-service
+edge
+# Data files are hand-formatted (one symptom per line) for readable diffs
+shared/data
+shared/tests
