@@ -1,0 +1,146 @@
+# GramHealth — local stack
+# Usage (from repo root):
+#   docker compose -f infra/docker-compose.yml up -d mongodb timescaledb mosquitto   # infra only
+#   docker compose -f infra/docker-compose.yml up --build                            # everything
+#
+# Variables like ${MONGO_ROOT_PASSWORD} are read from infra/.env (copy from infra/.env.example).
+# The app services also load their own <service>/.env. Hostnames are overridden below so they
+# point at compose service names instead of localhost.
+
+name: gramhealth
+
+services:
+  # ───────────────────────────── Data stores ─────────────────────────────
+  mongodb:
+    image: mongo:7
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DB}
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${TSDB_USER}
+      POSTGRES_PASSWORD: ${TSDB_PASSWORD}
+      POSTGRES_DB: ${TSDB_DB}
+    ports:
+      - "${TSDB_PORT:-5433}:5432"
+    volumes:
+      - tsdb-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${TSDB_USER} -d ${TSDB_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ───────────────────────────── Messaging ─────────────────────────────
+  mosquitto:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    ports:
+      - "${MQTT_PORT:-1883}:1883"
+      - "${MQTT_WS_PORT:-9001}:9001"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-log:/mosquitto/log
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-t", "$$SYS/broker/uptime", "-C", "1", "-W", "3"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # ───────────────────────────── Application ─────────────────────────────
+  ai-service:
+    build:
+      context: ../ai-service
+    restart: unless-stopped
+    env_file: ../ai-service/.env
+    ports:
+      - "${AI_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  server:
+    build:
+      context: ../server
+    restart: unless-stopped
+    env_file: ../server/.env
+    environment:
+      # Override localhost values from server/.env with compose service names
+      MONGO_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017/${MONGO_DB}?authSource=admin
+      TSDB_URL: postgres://${TSDB_USER}:${TSDB_PASSWORD}@timescaledb:5432/${TSDB_DB}
+      MQTT_URL: mqtt://mosquitto:1883
+      AI_SERVICE_URL: http://ai-service:8000
+    ports:
+      - "${SERVER_PORT:-4000}:4000"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      timescaledb:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+      ai-service:
+        condition: service_started
+
+  client:
+    build:
+      context: ../client
+      args:
+        # Vite env vars are baked in at build time
+        VITE_API_URL: ${CLIENT_API_URL:-http://localhost:4000}
+    restart: unless-stopped
+    ports:
+      - "${CLIENT_PORT:-8080}:80"
+    depends_on:
+      - server
+
+  # ───────────────────────────── Edge (Phase 4) ─────────────────────────────
+  # edge-simulator:
+  #   build:
+  #     context: ../edge
+  #   env_file: ../edge/.env
+  #   environment:
+  #     MQTT_URL: mqtt://mosquitto:1883
+  #   depends_on:
+  #     mosquitto:
+  #       condition: service_healthy
+
+  # ───────────────────────────── Streaming (Phase 6) ─────────────────────────────
+  # kafka:
+  #   image: bitnami/kafka:3.7
+  #   environment:
+  #     KAFKA_CFG_NODE_ID: 1
+  #     KAFKA_CFG_PROCESS_ROLES: controller,broker
+  #     KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+  #     KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+  #     KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+  #     KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
+  #     KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+  #   ports:
+  #     - "9092:9092"
+  #   volumes:
+  #     - kafka-data:/bitnami/kafka
+
+volumes:
+  mongo-data:
+  tsdb-data:
+  mosquitto-data:
+  mosquitto-log:
+  # kafka-data:

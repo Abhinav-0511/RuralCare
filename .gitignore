@@ -1,0 +1,29 @@
+# Env
+.env
+!.env.example
+
+# Node
+node_modules/
+dist/
+build/
+*.log
+coverage/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Data / model artifacts (large; regenerate via training script)
+ai-service/data/raw/
+ai-service/models/*.pkl
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
