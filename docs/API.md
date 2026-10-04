@@ -61,17 +61,47 @@ Both `POST /api/triage` (optional `clientId`) and `POST /api/triage/sync` (requi
 - **Simultaneous retries:** create exactly one session.
 - **`clientId` already used for a different patient:** rejected with `CLIENT_ID_CONFLICT`.
 
-## AI service contract (`POST {AI_SERVICE_URL}/predict`, implemented in Phase 3)
+## Model version (`GET /api/model/version`, public)
+
+The server proxies this from the AI service. The PWA compares `sha256` with its cached `/models/triage_model.onnx` (served by the client) to decide whether to download a new model. If the model is unavailable, the response is `503 MODEL_UNAVAILABLE`.
+
+```json
+{
+  "modelVersion": "lr-20261004-ab911d5e",
+  "algorithm": "Logistic Regression (C=10000)",
+  "createdAt": "…",
+  "sha256": "ab911d5e…",
+  "sizeBytes": 27607,
+  "featureCount": 131,
+  "classCount": 41
+}
+```
+
+## AI service contract (`POST {AI_SERVICE_URL}/predict`)
 
 ```jsonc
 // request: TriageContext
-{ "symptoms": ["cough", "mild_fever"], "ageMonths": 420, "sex": "female", "pregnant": false, "temperatureC": 38.1 }
+{ "symptoms": ["runny_nose", "congestion", "cough"], "ageMonths": 420, "sex": "female" }
 // response
-{ "level": "SELF_CARE", "confidence": 0.82, "modelVersion": "rf-2026-10-01",
-  "topConditions": [{ "id": "common_cold", "probability": 0.82 }] }
+{
+  "level": "SELF_CARE", "source": "model", "confidence": 0.7, "lowConfidence": false,
+  "modelVersion": "lr-20261004-ab911d5e", "rulesVersion": "1.2.0",
+  "topConditions": [
+    { "id": "common_cold", "probability": 0.7, "triageLevel": "SELF_CARE",
+      "name": { "en": "Common cold", "ta": "ஜலதோஷம்", "hi": "सामान्य सर्दी-ज़ुकाम" },
+      "advice": { "en": "Rest and drink warm fluids…", "ta": "…", "hi": "…" } }
+    // … top 3
+  ],
+  "advice": { "en": "Rest, drink plenty of clean water…", "ta": "…", "hi": "…" },
+  "disclaimer": { "en": "This is triage guidance, not a medical diagnosis…", "ta": "…", "hi": "…" },
+  "redFlags": [], "safetyFloors": [], "unmodelledSymptoms": []
+}
 ```
 
-`level` must be `SEE_DOCTOR_24H`, `SEE_DOCTOR_SOON` or `SELF_CARE`. Anything else, an HTTP error, or a 5 s timeout makes the server use the rules-only fallback.
+- **Red flags are re-checked by the AI service first.** If one matches, the service returns `level: "EMERGENCY"`, `source: "rule_engine"` and the matched `redFlags`, and the server accepts that as EMERGENCY. An EMERGENCY _without_ red flags is rejected as invalid, because the model itself can never say EMERGENCY.
+- **The level comes from the shared policy** in `shared/data/conditions.json`. Below 0.6 confidence, or with a symptom the model can't see, the level is at least `SEE_DOCTOR_SOON`. A serious runner-up can raise the level. Safety floors also apply.
+- **When the server falls back to rules only:** an HTTP error, an invalid payload, a 5 s timeout, or `503` (no model loaded).
+- **Condition names and advice** come from `/shared`. The server rebuilds them for `guidance.possibleConditions`, and the offline PWA uses the same texts.
 
 ## Errors
 

@@ -240,6 +240,11 @@ class RedFlagEngine:
     def floors(self) -> list[SafetyFloor]:
         return list(self._rule_set.floors)
 
+    @property
+    def red_flag_symptoms(self) -> frozenset[str]:
+        """Every symptom a red-flag rule refers to (any of them can trigger EMERGENCY)."""
+        return frozenset(s for r in self._rule_set.rules for s in _referenced_symptoms(r.when))
+
     def evaluate(self, ctx: TriageContext) -> RedFlagResult:
         symptoms: set[str] = set()
         unknown: list[str] = []

@@ -23,6 +23,7 @@ export interface SessionResult {
     modelVersion?: string;
     confidence?: number;
     reason?: string;
+    lowConfidence?: boolean;
     topConditions: { id: string; probability: number }[];
   };
 }
@@ -95,6 +96,7 @@ const triageSessionSchema = new Schema<TriageSessionFields>(
         modelVersion: String,
         confidence: Number,
         reason: String,
+        lowConfidence: Boolean,
         topConditions: [{ _id: false, id: String, probability: Number }],
       },
     },

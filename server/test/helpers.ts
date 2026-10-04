@@ -52,6 +52,16 @@ export const modelSays = (level: NonEmergencyLevelId): ModelOutcome => ({
 
 export type FakeAi = AiClient & { calls: TriageContext[] };
 
+export const TEST_MODEL_VERSION = {
+  modelVersion: 'test-model-1',
+  algorithm: 'Logistic Regression',
+  createdAt: '2026-10-04T00:00:00Z',
+  sha256: 'a'.repeat(64),
+  sizeBytes: 27000,
+  featureCount: 131,
+  classCount: 41,
+};
+
 /** Records every predict() call so tests can assert the model was (not) consulted. */
 export function fakeAi(
   behaviour: ModelOutcome | ((input: TriageContext) => ModelOutcome | Promise<ModelOutcome>) = AI_DOWN,
@@ -66,6 +76,9 @@ export function fakeAi(
     },
     async isHealthy() {
       return healthy;
+    },
+    async modelVersion() {
+      return healthy ? TEST_MODEL_VERSION : null;
     },
   };
 }

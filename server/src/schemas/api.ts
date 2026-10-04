@@ -257,6 +257,7 @@ export const TriageSessionSchema = z
         modelVersion: z.string().optional(),
         confidence: z.number().optional(),
         reason: z.string().optional(),
+        lowConfidence: z.boolean().optional(),
         topConditions: z.array(z.object({ id: z.string(), probability: z.number() })).optional(),
       }),
     }),
@@ -288,6 +289,17 @@ export const GuidanceSchema = z
       description: 'Present when the model was unavailable and the result is rules-only',
     }),
     reasons: z.array(LocalizedTextSchema),
+    possibleConditions: z
+      .array(
+        z.object({
+          id: z.string(),
+          probability: z.number(),
+          triageLevel: z.enum(NON_EMERGENCY_LEVELS),
+          name: LocalizedTextSchema,
+          advice: LocalizedTextSchema,
+        }),
+      )
+      .meta({ description: 'Top model suggestions (not a diagnosis); empty unless the model decided' }),
   })
   .meta({ id: 'Guidance' });
 
@@ -355,4 +367,14 @@ export const StatsResponseSchema = z
   })
   .meta({ id: 'DashboardStats' });
 
-export const PredictionLevelSchema = z.enum(NON_EMERGENCY_LEVELS);
+export const ModelVersionResponseSchema = z
+  .object({
+    modelVersion: z.string(),
+    algorithm: z.string(),
+    createdAt: z.string(),
+    sha256: z.string(),
+    sizeBytes: z.number().int(),
+    featureCount: z.number().int(),
+    classCount: z.number().int(),
+  })
+  .meta({ id: 'ModelVersion' });

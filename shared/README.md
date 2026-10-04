@@ -2,13 +2,15 @@
 
 This folder is the single source of truth for safety-critical data. The client, server and ai-service all read these files directly, so there are no copies to keep in sync.
 
-| File                        | What it holds                                                  | Read by                                                             |
-| --------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `data/red_flags.json`       | Deterministic red-flag rules → `EMERGENCY`                     | TS engine (client + server), Python engine (ai-service)             |
-| `data/symptoms.json`        | Symptom vocabulary with en / ta / hi labels                    | all                                                                 |
-| `data/triage_levels.json`   | The 4 triage levels, advice text, disclaimer, emergency number | all                                                                 |
-| `tests/red_flag_cases.json` | Golden test cases that **both** engines must pass              | `src/redFlags.golden.test.ts`, `ai-service/tests/test_red_flags.py` |
-| `src/`                      | TypeScript schemas (Zod) and the TS rule engine                | client (bundled by Vite), server (bundled by tsup)                  |
+| File                                 | What it holds                                                                    | Read by                                                             |
+| ------------------------------------ | -------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `data/red_flags.json`                | Deterministic red-flag rules → `EMERGENCY`                                       | TS engine (client + server), Python engine (ai-service)             |
+| `data/symptoms.json`                 | Symptom vocabulary with en / ta / hi labels                                      | all                                                                 |
+| `data/triage_levels.json`            | The 4 triage levels, advice text, disclaimer, emergency number                   | all                                                                 |
+| `data/conditions.json`               | 41 model conditions: en/ta/hi names, triage level, advice; low-confidence policy | ai-service (`/predict`), server (guidance), PWA (offline)           |
+| `tests/prediction_policy_cases.json` | Golden cases for model output → triage level                                     | `src/model.test.ts`, `ai-service/tests/test_policy.py`              |
+| `tests/red_flag_cases.json`          | Golden test cases that **both** engines must pass                                | `src/redFlags.golden.test.ts`, `ai-service/tests/test_red_flags.py` |
+| `src/`                               | TypeScript schemas (Zod) and the TS rule engine                                  | client (bundled by Vite), server (bundled by tsup)                  |
 
 The Python engine lives in [`ai-service/app/safety/red_flags.py`](../ai-service/app/safety/red_flags.py). It reads the same JSON files.
 

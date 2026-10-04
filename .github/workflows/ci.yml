@@ -35,6 +35,12 @@ jobs:
           cache: pip
           cache-dependency-path: ai-service/requirements-dev.txt
       - run: pip install -r requirements-dev.txt
+      # Enables tests/test_training.py (retrain + compare with the committed fixtures). Kaggle serves
+      # this public dataset without credentials; if it is unreachable those tests are skipped.
+      - name: Fetch dataset (optional)
+        run: python -m training.fetch_dataset
+        continue-on-error: true
+      - run: python -m training.check_dataset || echo "dataset not available, training tests will be skipped"
       - run: ruff check .
       - run: ruff format --check .
       - run: pytest -q

@@ -1,5 +1,5 @@
 # Build context: repo root (so /shared is available). See infra/docker-compose.yml.
-# Serves the pre-trained model; training runs outside the container (Phase 3).
+# Serves the committed ONNX model; training (python -m training.train) runs outside the container.
 FROM python:3.12-slim
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -8,6 +8,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 COPY ai-service/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY shared/data /shared/data
+COPY ai-service/models ./models
 COPY ai-service/app ./app
 RUN useradd --create-home appuser
 USER appuser

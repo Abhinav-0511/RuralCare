@@ -167,3 +167,54 @@ export const TriageInputSchema = TriageContextSchema.extend({
   ageMonths: z.number().int().min(0).max(1500),
 });
 export type TriageInput = z.infer<typeof TriageInputSchema>;
+
+// ───────────────────────────── Conditions & model ─────────────────────────────
+
+export const MedicalConditionSchema = z.strictObject({
+  id: z.string().regex(/^[a-z0-9_]+$/),
+  /** Exact label in the training dataset. */
+  datasetName: z.string(),
+  /** The model can never produce EMERGENCY. */
+  triageLevel: z.enum(NON_EMERGENCY_LEVELS),
+  name: LocalizedTextSchema,
+  advice: LocalizedTextSchema,
+});
+export type ConditionInfo = z.infer<typeof MedicalConditionSchema>;
+
+export const PredictionPolicySchema = z.strictObject({
+  topK: z.number().int().min(1).max(10),
+  /** Below this top-1 probability the result is never SELF_CARE. */
+  minConfidence: z.number().min(0).max(1),
+  /** A runner-up (within topK) at or above this probability can raise the level. */
+  escalateRunnerUpMinProbability: z.number().min(0).max(1),
+  notes: z.string().optional(),
+});
+export type PredictionPolicy = z.infer<typeof PredictionPolicySchema>;
+
+export const ConditionsFileSchema = z
+  .strictObject({
+    version: z.string(),
+    notes: z.string().optional(),
+    policy: PredictionPolicySchema,
+    conditions: z.array(MedicalConditionSchema).min(1),
+  })
+  .superRefine((file, ctx) => {
+    const ids = file.conditions.map((c) => c.id);
+    if (new Set(ids).size !== ids.length) ctx.addIssue({ code: 'custom', message: 'Duplicate condition id' });
+  });
+export type ConditionsFile = z.infer<typeof ConditionsFileSchema>;
+
+/** model_metadata.json written next to the ONNX file by ai-service/training. */
+export const ModelMetadataSchema = z.object({
+  modelVersion: z.string(),
+  algorithm: z.string(),
+  createdAt: z.string(),
+  sha256: z.string().regex(/^[a-f0-9]{64}$/),
+  sizeBytes: z.number().int().positive(),
+  onnx: z.object({ inputName: z.string(), outputName: z.string(), opset: z.number().int() }),
+  /** Input vector order: 1 if the symptom is present. */
+  features: z.array(z.string()).min(1),
+  /** Output probability order (condition ids). */
+  classes: z.array(z.string()).min(1),
+});
+export type ModelMetadata = z.infer<typeof ModelMetadataSchema>;

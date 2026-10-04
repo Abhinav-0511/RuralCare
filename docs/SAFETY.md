@@ -55,6 +55,14 @@ Age changes the meaning of many symptoms. Fever is the clearest example: it is r
 
 This makes the rule depend on the user actually answering the pregnancy question, which leads to the next requirement.
 
+### 3.4 What the model may and may not decide (Phase 3)
+
+- **The model never decides EMERGENCY.** Even "heart attack" or "brain haemorrhage" map to `SEE_DOCTOR_24H` at most. Emergencies come only from the red-flag rules, which run first.
+- **Low confidence never gives SELF_CARE.** If the top condition's probability is below 0.6, the result is at least `SEE_DOCTOR_SOON`. The same applies if the patient reports a symptom the model has no feature for (e.g. vaginal bleeding without pregnancy), or no symptom the model knows at all.
+- **A serious runner-up raises the level.** If a more urgent condition is in the top 3 with probability ≥ 0.25, its level is used.
+- **Dataset synonyms of red flags are red flags.** The dataset's `coma` counts as _unconscious_, and its `stomach_bleeding` counts as _severe bleeding_.
+- **Accuracy is measured honestly.** Results include a noisy test set and the under-triage rate. See [MODEL_REPORT.md](MODEL_REPORT.md), including why the confidence threshold only became meaningful after tuning the model's regularisation.
+
 ## 4. Requirements for the Phase 5 app
 
 - [ ] **Age is a required field** on every triage form. Accept years or months for babies, and store `ageMonths`.

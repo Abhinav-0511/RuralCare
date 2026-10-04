@@ -1,15 +1,7 @@
 // Demo data for development and dashboards. All people and phone numbers are fictional.
 // Villages are real places near Chennai (approximate coordinates).
 import { randomUUID } from 'node:crypto';
-import {
-  decideTriage,
-  MODEL_UNAVAILABLE_FALLBACK_LEVEL,
-  type ModelOutcome,
-  type NonEmergencyLevelId,
-  redFlagEngine,
-  type Sex,
-  type TriageContext,
-} from '@ruralcare/shared';
+import { type Sex, type TriageContext } from '@ruralcare/shared';
 import bcrypt from 'bcryptjs';
 import type { Types } from 'mongoose';
 import { ageInMonths } from '../lib/dates';
@@ -17,7 +9,8 @@ import { Patient } from '../models/patient';
 import { TriageSession } from '../models/triageSession';
 import { User } from '../models/user';
 import { Village } from '../models/village';
-import { decisionToResult } from './triageService';
+import type { AiClient } from './aiClient';
+import { decisionToResult, evaluateTriage } from './triageService';
 
 export const DEMO_PASSWORD = 'RuralCare@123';
 
@@ -72,8 +65,6 @@ const PATIENTS: DemoPatient[] = [
 
 interface Scenario {
   symptoms: string[];
-  /** What the (not yet trained) model is pretended to say. Ignored when a red flag matches. */
-  demoLevel: NonEmergencyLevelId;
   fever?: boolean;
   weight: number;
   when?: (p: DemoPatient, ageMonths: number) => boolean;
@@ -83,55 +74,48 @@ const isInfant = (_p: DemoPatient, m: number) => m < 12;
 const notInfant = (_p: DemoPatient, m: number) => m >= 12;
 
 const SCENARIOS: Scenario[] = [
-  { symptoms: ['cough', 'runny_nose', 'continuous_sneezing'], demoLevel: 'SELF_CARE', weight: 6 },
+  { symptoms: ['cough', 'runny_nose', 'congestion', 'sinus_pressure'], weight: 6 },
   {
     symptoms: ['diarrhoea', 'vomiting', 'dehydration'],
-    demoLevel: 'SEE_DOCTOR_24H',
     weight: 3,
     when: notInfant,
   },
   {
     symptoms: ['burning_micturition', 'abdominal_pain'],
-    demoLevel: 'SEE_DOCTOR_SOON',
     weight: 2,
     when: notInfant,
   },
   {
     symptoms: ['yellowish_skin', 'dark_urine', 'fatigue', 'loss_of_appetite'],
-    demoLevel: 'SEE_DOCTOR_24H',
     weight: 1,
     when: notInfant,
   },
   {
     symptoms: ['high_fever', 'joint_pain', 'headache', 'skin_rash'],
-    demoLevel: 'SEE_DOCTOR_24H',
     fever: true,
     weight: 3,
   },
-  { symptoms: ['itching', 'skin_rash'], demoLevel: 'SEE_DOCTOR_SOON', weight: 2 },
-  { symptoms: ['back_pain', 'muscle_pain'], demoLevel: 'SELF_CARE', weight: 2, when: notInfant },
+  { symptoms: ['itching', 'skin_rash'], weight: 2 },
+  { symptoms: ['back_pain', 'muscle_pain'], weight: 2, when: notInfant },
   {
     symptoms: ['headache', 'fatigue', 'dizziness'],
-    demoLevel: 'SEE_DOCTOR_SOON',
     weight: 2,
     when: notInfant,
   },
-  { symptoms: ['mild_fever', 'cough', 'throat_irritation'], demoLevel: 'SELF_CARE', fever: true, weight: 3 },
-  { symptoms: ['chest_pain', 'sweating'], demoLevel: 'SEE_DOCTOR_24H', weight: 1, when: (_p, m) => m >= 360 },
-  { symptoms: ['breathlessness', 'cough'], demoLevel: 'SEE_DOCTOR_24H', weight: 1 },
+  { symptoms: ['mild_fever', 'cough', 'throat_irritation'], fever: true, weight: 3 },
+  { symptoms: ['chest_pain', 'sweating'], weight: 1, when: (_p, m) => m >= 360 },
+  { symptoms: ['breathlessness', 'cough'], weight: 1 },
   {
     symptoms: ['slurred_speech', 'weakness_of_one_body_side'],
-    demoLevel: 'SEE_DOCTOR_24H',
     weight: 1,
     when: (_p, m) => m >= 600,
   },
   {
     symptoms: ['vaginal_bleeding', 'abdominal_pain'],
-    demoLevel: 'SEE_DOCTOR_24H',
     weight: 2,
     when: (p) => !!p.pregnant,
   },
-  { symptoms: ['high_fever'], demoLevel: 'SEE_DOCTOR_24H', fever: true, weight: 4, when: isInfant },
+  { symptoms: ['high_fever'], fever: true, weight: 4, when: isInfant },
 ];
 
 const REVIEW_NOTES = [
@@ -161,6 +145,8 @@ export interface SeedSummary {
 
 export async function seedDemoData(options: {
   bcryptRounds: number;
+  /** Sessions are evaluated exactly like live triage: rules first, then this AI client. */
+  ai: AiClient;
   sessionCount?: number;
   now?: Date;
 }): Promise<SeedSummary> {
@@ -242,23 +228,8 @@ export async function seedDemoData(options: {
       ...(scenario.fever ? { temperatureC: Math.round((38.2 + rand() * 1.4) * 10) / 10 } : {}),
     };
 
-    // Real rule engine. For non-emergencies the model isn't trained yet (Phase 3), so ~90% use the
-    // scenario's demo level (labelled modelVersion "demo-seed") and ~10% show the rules-only fallback.
-    const redFlags = redFlagEngine.evaluate(input);
-    const model: ModelOutcome | null = redFlags.isEmergency
-      ? null
-      : rand() < 0.1
-        ? { status: 'unavailable', reason: 'AI service unreachable' }
-        : {
-            status: 'ok',
-            prediction: {
-              level: scenario.demoLevel,
-              confidence: Math.round((0.6 + rand() * 0.35) * 100) / 100,
-              modelVersion: 'demo-seed',
-              topConditions: [],
-            },
-          };
-    const decision = decideTriage(redFlags, model, MODEL_UNAVAILABLE_FALLBACK_LEVEL);
+    // Same path as POST /api/triage: red-flag rules, then the real model via the AI service.
+    const decision = await evaluateTriage(input, options.ai);
 
     const ageDays = (now.getTime() - occurredAt.getTime()) / (24 * 60 * 60 * 1000);
     const reviewed = ageDays > 2 && rand() < 0.7;

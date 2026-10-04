@@ -16,16 +16,16 @@ The app supports English, Tamil (தமிழ்) and Hindi (हिन्दी)
 
 ## Architecture at a glance
 
-| Layer          | Tech                                                                                                              | Folder                       |
-| -------------- | ----------------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| Frontend (PWA) | React + TypeScript (Vite), TailwindCSS, vite-plugin-pwa / Workbox, Dexie.js (IndexedDB), onnxruntime-web, i18next | [`client/`](client/)         |
-| API            | Node.js + Express (TypeScript), Mongoose, JWT + RBAC, Zod                                                         | [`server/`](server/)         |
-| AI service     | Python FastAPI, scikit-learn → ONNX (skl2onnx)                                                                    | [`ai-service/`](ai-service/) |
-| Primary DB     | MongoDB (users, triage sessions, sync records)                                                                    | —                            |
-| Time-series DB | TimescaleDB (PostgreSQL) for patient vitals                                                                       | —                            |
-| Edge           | Eclipse Mosquitto (MQTT) + Python vitals simulator                                                                | [`edge/`](edge/)             |
-| Infra          | Docker Compose (now), Kafka + Kubernetes (later)                                                                  | [`infra/`](infra/)           |
-| Docs           | Architecture, API docs, report notes                                                                              | [`docs/`](docs/)             |
+| Layer          | Tech                                                                                                               | Folder                       |
+| -------------- | ------------------------------------------------------------------------------------------------------------------ | ---------------------------- |
+| Frontend (PWA) | React + TypeScript (Vite), TailwindCSS, vite-plugin-pwa / Workbox, Dexie.js (IndexedDB), onnxruntime-web, i18next  | [`client/`](client/)         |
+| API            | Node.js + Express (TypeScript), Mongoose, JWT + RBAC, Zod                                                          | [`server/`](server/)         |
+| AI service     | Python FastAPI + onnxruntime; scikit-learn → ONNX (skl2onnx) training. See [MODEL_REPORT.md](docs/MODEL_REPORT.md) | [`ai-service/`](ai-service/) |
+| Primary DB     | MongoDB (users, triage sessions, sync records)                                                                     | —                            |
+| Time-series DB | TimescaleDB (PostgreSQL) for patient vitals                                                                        | —                            |
+| Edge           | Eclipse Mosquitto (MQTT) + Python vitals simulator                                                                 | [`edge/`](edge/)             |
+| Infra          | Docker Compose (now), Kafka + Kubernetes (later)                                                                   | [`infra/`](infra/)           |
+| Docs           | Architecture, API docs, report notes                                                                               | [`docs/`](docs/)             |
 
 The full component diagram and the online and offline data flows are in **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
 
@@ -128,6 +128,7 @@ npm run lint && npm run typecheck && npm run format:check
 
 # Python AI service
 cd ai-service
+# (model is committed; to retrain: python -m training.fetch_dataset && python -m training.train)
 python -m venv .venv
 .venv/Scripts/pip install -r requirements-dev.txt    # .venv/bin/pip on macOS/Linux
 .venv/Scripts/python -m pytest

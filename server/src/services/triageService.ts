@@ -50,6 +50,7 @@ export function decisionToResult(decision: TriageDecision): SessionResult {
             status: 'ok',
             modelVersion: model.modelVersion,
             confidence: model.confidence,
+            lowConfidence: model.lowConfidence ?? false,
             topConditions: model.topConditions,
           }
         : model.status === 'unavailable'
@@ -92,5 +93,8 @@ export async function insertSessionIdempotent(
 }
 
 export function toSessionResponse(session: SessionDoc) {
-  return { session: session.toJSON(), guidance: buildGuidance(session.result) };
+  return {
+    session: session.toJSON(),
+    guidance: buildGuidance(session.result, session.result.model.topConditions),
+  };
 }

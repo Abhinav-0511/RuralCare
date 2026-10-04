@@ -79,6 +79,47 @@ describe('model path', () => {
     expect(ai.calls[0]).toMatchObject({ symptoms: ['itching', 'skin_rash'], sex: 'female' });
   });
 
+  it("lists the model's possible conditions with names and advice in en/ta/hi", async () => {
+    const ai = fakeAi({
+      status: 'ok',
+      prediction: {
+        level: 'SEE_DOCTOR_24H',
+        confidence: 0.7,
+        lowConfidence: false,
+        modelVersion: 'test-model-1',
+        topConditions: [
+          { id: 'dengue', probability: 0.7 },
+          { id: 'malaria', probability: 0.2 },
+          { id: 'typhoid', probability: 0.05 },
+        ],
+      },
+    });
+    const res = await post(makeApp(ai), adultInput(['high_fever', 'joint_pain', 'pain_behind_the_eyes']));
+    const conditions = res.body.guidance.possibleConditions;
+    expect(conditions.map((c: { id: string }) => c.id)).toEqual(['dengue', 'malaria', 'typhoid']);
+    expect(conditions[0]).toMatchObject({
+      probability: 0.7,
+      triageLevel: 'SEE_DOCTOR_24H',
+      name: { ta: 'டெங்கு' },
+    });
+    expect(conditions[0].advice.hi.length).toBeGreaterThan(10);
+    expect(res.body.session.result.model).toMatchObject({
+      lowConfidence: false,
+      modelVersion: 'test-model-1',
+    });
+  });
+
+  it("escalates to EMERGENCY when the AI service's own rules find a red flag", async () => {
+    const ai = fakeAi({ status: 'rules_emergency', redFlags: ['RF_NEW_RULE_ON_AI'] });
+    const res = await post(makeApp(ai), adultInput(['cough']));
+    expect(res.body.session.result).toMatchObject({
+      level: 'EMERGENCY',
+      source: 'rule_engine',
+      redFlags: ['RF_NEW_RULE_ON_AI'],
+    });
+    expect(res.body.guidance.possibleConditions).toEqual([]);
+  });
+
   it('every result carries the disclaimer', async () => {
     const res = await post(makeApp(fakeAi(modelSays('SELF_CARE'))), adultInput(['cough']));
     expect(res.body.guidance.disclaimer).toEqual(triageLevels.disclaimer);

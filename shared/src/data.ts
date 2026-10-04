@@ -1,9 +1,12 @@
 // Loads the shared JSON data. Validated once at import time, so an invalid data file fails fast.
+import conditionsJson from '../data/conditions.json';
 import redFlagsJson from '../data/red_flags.json';
 import symptomsJson from '../data/symptoms.json';
 import triageLevelsJson from '../data/triage_levels.json';
 import { createRedFlagEngine } from './redFlags';
 import {
+  type ConditionInfo,
+  ConditionsFileSchema,
   type Locale,
   type LocalizedText,
   SymptomVocabularySchema,
@@ -16,6 +19,14 @@ import type { TriageDecision } from './triage';
 export const symptomVocabulary = SymptomVocabularySchema.parse(symptomsJson);
 export const triageLevels = TriageLevelsFileSchema.parse(triageLevelsJson);
 export const redFlagEngine = createRedFlagEngine(redFlagsJson, symptomsJson);
+export const conditionsFile = ConditionsFileSchema.parse(conditionsJson);
+
+const conditionsById = new Map(conditionsFile.conditions.map((c) => [c.id, c]));
+export function getCondition(id: string): ConditionInfo {
+  const condition = conditionsById.get(id);
+  if (!condition) throw new Error(`Unknown condition ${id}`);
+  return condition;
+}
 
 export const EMERGENCY_NUMBER = triageLevels.emergencyNumber;
 export const MODEL_UNAVAILABLE_FALLBACK_LEVEL = triageLevels.modelUnavailable.fallbackLevel;
@@ -39,11 +50,20 @@ export interface TriageGuidance {
   notice?: LocalizedText;
   /** Labels of the red flags / safety floors that drove the result. */
   reasons: LocalizedText[];
+  /** Possible conditions suggested by the model (empty when the model wasn't used). Not a diagnosis. */
+  possibleConditions: {
+    id: string;
+    probability: number;
+    triageLevel: ConditionInfo['triageLevel'];
+    name: LocalizedText;
+    advice: LocalizedText;
+  }[];
 }
 
 /** Everything the UI needs to show a result, in every supported language. */
 export function buildGuidance(
   decision: Pick<TriageDecision, 'level' | 'source' | 'redFlags' | 'safetyFloors'>,
+  topConditions: readonly { id: string; probability: number }[] = [],
 ): TriageGuidance {
   const level = getTriageLevel(decision.level);
   const reasons = [
@@ -56,5 +76,20 @@ export function buildGuidance(
     disclaimer: triageLevels.disclaimer,
     ...(decision.source === 'rule_engine_fallback' ? { notice: triageLevels.modelUnavailable.notice } : {}),
     reasons,
+    possibleConditions:
+      decision.source === 'model'
+        ? topConditions
+            .filter((c) => conditionsById.has(c.id))
+            .map((c) => {
+              const info = getCondition(c.id);
+              return {
+                id: c.id,
+                probability: c.probability,
+                triageLevel: info.triageLevel,
+                name: info.name,
+                advice: info.advice,
+              };
+            })
+        : [],
   };
 }

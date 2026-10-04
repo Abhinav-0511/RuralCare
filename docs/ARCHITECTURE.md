@@ -154,13 +154,13 @@ sequenceDiagram
 
 ## Delivery phases
 
-Safety decisions and the Phase 5 form requirements (age required, pregnancy question) are in [SAFETY.md](SAFETY.md).
+Model evaluation and limitations: [MODEL_REPORT.md](MODEL_REPORT.md). Safety decisions and the Phase 5 form requirements (age required, pregnancy question) are in [SAFETY.md](SAFETY.md).
 
-| Phase | Scope                                                                                                                                                                            | Status  |
-| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| 1     | `/shared` rules, vocabulary and triage levels; TS and Python red-flag engines with shared golden tests; npm workspaces, lint/format, health endpoints, Docker builds, CI         | ✅ Done |
-| 2     | Backend API: Mongoose models, JWT + RBAC, Zod validation, triage with rules-only fallback, idempotent sync, doctor review, dashboard stats, Swagger UI, seed data, safety floors | ✅ Done |
-| 3     | Kaggle dataset, sklearn training, clean + noisy evaluation, ONNX export, disease → triage mapping, FastAPI `/predict`, `docs/MODEL_REPORT.md`                                    | ⏳      |
-| 4     | MQTT vitals simulator, server subscriber → TimescaleDB hypertable, threshold alerts, Mosquitto auth                                                                              | ⏳      |
-| 5     | Offline-first PWA: Workbox, symptom checklist, in-browser rules + ONNX, Dexie outbox sync, en/ta/hi, dashboards                                                                  | ⏳      |
-| 6     | Kafka, Kubernetes manifests, security hardening, Playwright E2E (incl. offline), Lighthouse, final report                                                                        | ⏳      |
+| Phase | Scope                                                                                                                                                                                                                                                                                 | Status  |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| 1     | `/shared` rules, vocabulary and triage levels; TS and Python red-flag engines with shared golden tests; npm workspaces, lint/format, health endpoints, Docker builds, CI                                                                                                              | ✅ Done |
+| 2     | Backend API: Mongoose models, JWT + RBAC, Zod validation, triage with rules-only fallback, idempotent sync, doctor review, dashboard stats, Swagger UI, seed data, safety floors                                                                                                      | ✅ Done |
+| 3     | Kaggle dataset (verified, not committed), dedup + 5-fold CV, clean + noisy evaluation, 3 models compared, tuned logistic regression → 27 KB ONNX, parity sklearn ↔ onnxruntime ↔ onnxruntime-node, conditions + advice in /shared, `/predict`, `/model/version`, real-model seed data | ✅ Done |
+| 4     | MQTT vitals simulator, server subscriber → TimescaleDB hypertable, threshold alerts, Mosquitto auth                                                                                                                                                                                   | ⏳      |
+| 5     | Offline-first PWA: Workbox, symptom checklist, in-browser rules + ONNX, Dexie outbox sync, en/ta/hi, dashboards                                                                                                                                                                       | ⏳      |
+| 6     | Kafka, Kubernetes manifests, security hardening, Playwright E2E (incl. offline), Lighthouse, final report                                                                                                                                                                             | ⏳      |

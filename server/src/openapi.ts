@@ -233,6 +233,21 @@ export function buildOpenApiDocument() {
     },
   });
 
+  // ── Model ──
+  path({
+    method: 'get',
+    path: '/api/model/version',
+    tags: ['Model'],
+    summary: 'Current triage model version and file hash (public)',
+    description:
+      'The PWA compares `sha256` with its cached `/models/triage_model.onnx` to decide whether to download ' +
+      'a new model. Proxied from the AI service.',
+    responses: {
+      200: json(S.ModelVersionResponseSchema, 'Model version'),
+      503: json(S.ErrorSchema, 'AI service or model unavailable'),
+    },
+  });
+
   // ── Dashboard ──
   path({
     method: 'get',

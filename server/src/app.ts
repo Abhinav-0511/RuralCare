@@ -11,6 +11,7 @@ import { createErrorHandler, notFoundHandler } from './middleware/errorHandler';
 import { buildOpenApiDocument } from './openapi';
 import { authRouter } from './routes/auth';
 import { dashboardRouter } from './routes/dashboard';
+import { modelRouter } from './routes/model';
 import { patientsRouter } from './routes/patients';
 import { triageRouter } from './routes/triage';
 import { usersRouter } from './routes/users';
@@ -72,6 +73,7 @@ export function createApp({ env, ai }: AppDeps) {
 
   app.use('/api/auth', authRouter({ tokens, env }));
   app.use('/api/villages', villagesRouter({ tokens }));
+  app.use('/api/model', modelRouter({ ai }));
   app.use('/api/users', requireAuth, usersRouter({ env }));
   app.use('/api/patients', requireAuth, patientsRouter());
   app.use('/api/triage', requireAuth, triageRouter({ ai }));

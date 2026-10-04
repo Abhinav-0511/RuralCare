@@ -9,6 +9,8 @@
     {"name": "stroke: face drooping alone", "input": {"symptoms": ["face_drooping"]}, "expected": {"isEmergency": true, "matchedRuleIds": ["RF_STROKE_SIGNS"]}},
     {"name": "stroke: one-sided weakness", "input": {"symptoms": ["weakness_of_one_body_side"]}, "expected": {"isEmergency": true, "matchedRuleIds": ["RF_STROKE_SIGNS"]}},
     {"name": "stroke: slurred speech", "input": {"symptoms": ["slurred_speech", "headache"]}, "expected": {"isEmergency": true, "matchedRuleIds": ["RF_STROKE_SIGNS"]}},
+    {"name": "dataset symptom 'coma' counts as unconscious", "input": {"symptoms": ["coma", "yellowish_skin"]}, "expected": {"isEmergency": true, "matchedRuleIds": ["RF_UNCONSCIOUS"]}},
+    {"name": "dataset symptom 'stomach_bleeding' counts as severe bleeding", "input": {"symptoms": ["stomach_bleeding"]}, "expected": {"isEmergency": true, "matchedRuleIds": ["RF_SEVERE_BLEEDING"]}},
     {"name": "seizure", "input": {"symptoms": ["seizure"]}, "expected": {"isEmergency": true, "matchedRuleIds": ["RF_SEIZURE"]}},
     {"name": "mild fever, 2-month-old", "input": {"symptoms": ["mild_fever"], "ageMonths": 2}, "expected": {"isEmergency": true, "matchedRuleIds": ["RF_FEVER_YOUNG_INFANT"]}},
     {"name": "measured 38.2C, 1-month-old, no symptoms ticked", "input": {"symptoms": [], "ageMonths": 1, "temperatureC": 38.2}, "expected": {"isEmergency": true, "matchedRuleIds": ["RF_FEVER_YOUNG_INFANT"]}},

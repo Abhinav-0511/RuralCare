@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 import { loadEnv } from '../src/config/env';
-import { fakeAi, makeApp, useTestDb } from './helpers';
+import { fakeAi, makeApp, TEST_MODEL_VERSION, useTestDb } from './helpers';
 
 useTestDb();
 
@@ -38,6 +38,21 @@ describe('GET /health', () => {
   });
 });
 
+describe('GET /api/model/version', () => {
+  it('proxies the AI service model version (public, no-cache)', async () => {
+    const res = await request(makeApp(fakeAi(undefined, true))).get('/api/model/version');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual(TEST_MODEL_VERSION);
+    expect(res.headers['cache-control']).toBe('no-cache');
+  });
+
+  it('is 503 when the model is unavailable', async () => {
+    const res = await request(makeApp(fakeAi(undefined, false))).get('/api/model/version');
+    expect(res.status).toBe(503);
+    expect(res.body.error.code).toBe('MODEL_UNAVAILABLE');
+  });
+});
+
 describe('API docs', () => {
   it('serves an OpenAPI 3.1 document covering every route', async () => {
     const res = await request(makeApp()).get('/api/openapi.json');
@@ -50,6 +65,7 @@ describe('API docs', () => {
       '/api/auth/refresh',
       '/api/auth/register',
       '/api/dashboard/stats',
+      '/api/model/version',
       '/api/patients',
       '/api/patients/{id}',
       '/api/triage',

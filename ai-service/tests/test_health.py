@@ -11,4 +11,5 @@ def test_health_reports_shared_rules() -> None:
     body = res.json()
     assert body["status"] == "ok"
     assert body["shared"]["redFlagRuleCount"] >= 8
-    assert body["model"]["loaded"] is False
+    assert body["model"]["loaded"] is True
+    assert body["model"]["modelVersion"].startswith("lr-")

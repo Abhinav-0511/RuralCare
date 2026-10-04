@@ -1,0 +1,5 @@
+# Only needed to (re)train the model: python -m training.train
+scikit-learn~=1.9.1
+skl2onnx~=1.20.0
+onnx~=1.23.1
+matplotlib~=3.11.2

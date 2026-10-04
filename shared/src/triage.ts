@@ -14,10 +14,15 @@ export interface ModelPrediction {
   confidence: number;
   modelVersion: string;
   topConditions: { id: string; probability: number }[];
+  /** Top-1 probability was below the policy threshold (the level was raised to at least SEE_DOCTOR_SOON). */
+  lowConfidence?: boolean;
 }
 
 export type ModelOutcome =
-  { status: 'ok'; prediction: ModelPrediction } | { status: 'unavailable'; reason: string };
+  | { status: 'ok'; prediction: ModelPrediction }
+  | { status: 'unavailable'; reason: string }
+  /** The AI service's own red-flag check (defence in depth) found an emergency the caller's didn't. */
+  | { status: 'rules_emergency'; redFlags: string[] };
 
 export type TriageSource = 'rule_engine' | 'model' | 'rule_engine_fallback';
 
@@ -56,6 +61,17 @@ export function decideTriage(
 
   if (redFlags.isEmergency) {
     return { ...base, level: 'EMERGENCY', source: 'rule_engine', model: { status: 'not_called' } };
+  }
+
+  if (model?.status === 'rules_emergency') {
+    // Only possible if the two rule sets differ (e.g. different versions deployed): the safer answer wins.
+    return {
+      ...base,
+      redFlags: [...new Set([...base.redFlags, ...model.redFlags])],
+      level: 'EMERGENCY',
+      source: 'rule_engine',
+      model: { status: 'not_called' },
+    };
   }
 
   if (model?.status === 'ok') {

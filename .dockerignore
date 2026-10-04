@@ -12,3 +12,6 @@
 docs
 infra
 edge
+ai-service/data
+ai-service/training
+ai-service/tests

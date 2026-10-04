@@ -6,14 +6,15 @@ import { TriageSession } from '../src/models/triageSession';
 import { User } from '../src/models/user';
 import { ensureAdmin } from '../src/services/bootstrap';
 import { DEMO_PASSWORD, seedDemoData } from '../src/services/seed';
-import { makeApp, testEnv, useTestDb } from './helpers';
+import { fakeAi, makeApp, modelSays, testEnv, useTestDb } from './helpers';
 
 useTestDb();
 const app = makeApp();
+const ai = fakeAi(modelSays('SEE_DOCTOR_SOON'));
 
 describe('seedDemoData', () => {
   it('creates villages, staff, patients and sessions that dashboards can use', async () => {
-    const summary = await seedDemoData({ bcryptRounds: 4, sessionCount: 60 });
+    const summary = await seedDemoData({ bcryptRounds: 4, sessionCount: 60, ai });
     expect(summary).toMatchObject({ villages: 6, patients: 18, sessions: 60 });
     expect(await User.countDocuments({ role: 'health_worker' })).toBe(3);
     expect(await User.countDocuments({ role: 'doctor' })).toBe(2);
@@ -27,6 +28,13 @@ describe('seedDemoData', () => {
     }
     expect(sessions.some((s) => s.result.level === 'EMERGENCY')).toBe(true);
     expect(sessions.some((s) => s.review.status === 'reviewed')).toBe(true);
+
+    // Non-emergency sessions come from the AI client (no placeholder model versions).
+    const modelled = sessions.filter((s) => s.result.source === 'model');
+    expect(modelled.length).toBeGreaterThan(0);
+    expect(modelled.every((s) => s.result.model.modelVersion === 'test-model-1')).toBe(true);
+    expect(await TriageSession.countDocuments({ 'result.model.modelVersion': 'demo-seed' })).toBe(0);
+    expect(ai.calls.length).toBe(modelled.length);
 
     // The patient login is linked both ways.
     const patientUser = await User.findOne({ role: 'patient' });
@@ -46,8 +54,8 @@ describe('seedDemoData', () => {
   });
 
   it('is repeatable (wipes before seeding)', async () => {
-    await seedDemoData({ bcryptRounds: 4, sessionCount: 10 });
-    await seedDemoData({ bcryptRounds: 4, sessionCount: 10 });
+    await seedDemoData({ bcryptRounds: 4, sessionCount: 10, ai });
+    await seedDemoData({ bcryptRounds: 4, sessionCount: 10, ai });
     expect(await TriageSession.countDocuments()).toBe(10);
     expect(await User.countDocuments()).toBe(7);
   });
