@@ -29,6 +29,10 @@ def test_golden_case(engine: RedFlagEngine, case: dict) -> None:
     assert sorted(r.id for r in result.matched_rules) == sorted(expected["matchedRuleIds"])
     if "unknownSymptoms" in expected:
         assert result.unknown_symptoms == expected["unknownSymptoms"]
+    if "minimumLevel" in expected:
+        assert result.minimum_level == expected["minimumLevel"]
+    if "floorIds" in expected:
+        assert sorted(f.id for f in result.matched_floors) == sorted(expected["floorIds"])
 
 
 def _rules(*rules: dict) -> dict:
@@ -56,6 +60,19 @@ def test_duplicate_rule_ids_rejected() -> None:
     rule = {"id": "RF_X", "label": LABEL, "when": {"anySymptoms": ["chest_pain"]}}
     with pytest.raises(ValueError, match="Duplicate"):
         RedFlagEngine(_rules(rule, rule), VOCAB)
+
+
+@pytest.mark.parametrize(
+    ("min_level", "symptom", "match"),
+    [("EMERGENCY", "cough", None), ("SEE_DOCTOR_24H", "nope", "nope")],
+    ids=["floor cannot set EMERGENCY", "floor with unknown symptom"],
+)
+def test_invalid_floors_fail_closed(min_level: str, symptom: str, match: str | None) -> None:
+    raw = _rules({"id": "RF_X", "label": LABEL, "when": {"anySymptoms": ["chest_pain"]}})
+    floor = {"id": "FLOOR_X", "label": LABEL, "minLevel": min_level, "when": {"anySymptoms": [symptom]}}
+    raw["floors"] = [floor]
+    with pytest.raises(ValueError, match=match):
+        RedFlagEngine(raw, VOCAB)
 
 
 def test_missing_translation_rejected() -> None:
@@ -93,3 +110,4 @@ def test_context_validation_mirrors_typescript_schema() -> None:
 def test_same_rule_ids_as_shared_file(engine: RedFlagEngine) -> None:
     raw = json.loads((SHARED / "data" / "red_flags.json").read_text(encoding="utf-8"))
     assert [r.id for r in engine.rules] == [r["id"] for r in raw["rules"]]
+    assert [f.id for f in engine.floors] == [f["id"] for f in raw["floors"]]

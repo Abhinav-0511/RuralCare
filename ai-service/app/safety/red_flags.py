@@ -16,6 +16,11 @@ from typing import Annotated, Literal, Union
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from pydantic.alias_generators import to_camel
 
+# Ordered most -> least severe (mirrors TRIAGE_LEVELS in shared/src/schemas.ts).
+TRIAGE_LEVELS = ("EMERGENCY", "SEE_DOCTOR_24H", "SEE_DOCTOR_SOON", "SELF_CARE")
+TriageLevelId = Literal["EMERGENCY", "SEE_DOCTOR_24H", "SEE_DOCTOR_SOON", "SELF_CARE"]
+NonEmergencyLevelId = Literal["SEE_DOCTOR_24H", "SEE_DOCTOR_SOON", "SELF_CARE"]
+
 NonEmptyStr = Annotated[str, StringConstraints(min_length=1)]
 SymptomList = Annotated[list[str], Field(min_length=1)]
 SymptomId = Annotated[str, StringConstraints(min_length=1, max_length=64)]
@@ -50,6 +55,10 @@ class AgeMonthsGte(_Strict):
     ageMonthsGte: Annotated[float, Field(ge=0)]  # noqa: N815
 
 
+class AgeKnown(_Strict):
+    ageKnown: bool  # noqa: N815
+
+
 class Pregnant(_Strict):
     pregnant: bool
 
@@ -67,7 +76,7 @@ class AnyOf(_Strict):
 
 
 Condition = Union[  # noqa: UP007
-    AnySymptoms, AllSymptoms, AgeMonthsLt, AgeMonthsGte, Pregnant, TemperatureCGte, AllOf, AnyOf
+    AnySymptoms, AllSymptoms, AgeMonthsLt, AgeMonthsGte, AgeKnown, Pregnant, TemperatureCGte, AllOf, AnyOf
 ]
 AllOf.model_rebuild()
 AnyOf.model_rebuild()
@@ -79,10 +88,20 @@ class RedFlagRule(_Strict):
     when: Condition
 
 
+class SafetyFloor(_Strict):
+    """Never EMERGENCY: sets the minimum level the final result may have."""
+
+    id: Annotated[str, StringConstraints(pattern=r"^FLOOR_[A-Z0-9_]+$")]
+    label: LocalizedText
+    minLevel: NonEmergencyLevelId  # noqa: N815
+    when: Condition
+
+
 class RedFlagRuleSet(_Strict):
     version: str
     notes: str | None = None
     rules: Annotated[list[RedFlagRule], Field(min_length=1)]
+    floors: list[SafetyFloor] = []
 
 
 class Symptom(_Strict):
@@ -108,6 +127,7 @@ class TriageContext(BaseModel):
 
     symptoms: Annotated[list[SymptomId], Field(max_length=50)]
     age_months: Annotated[int, Field(ge=0, le=1500)] | None = None
+    sex: Literal["female", "male", "other"] | None = None
     pregnant: bool | None = None
     temperature_c: Annotated[float, Field(ge=30, le=45)] | None = None
 
@@ -117,6 +137,9 @@ class RedFlagResult:
     is_emergency: bool
     level: Literal["EMERGENCY"] | None
     matched_rules: list[RedFlagRule]
+    matched_floors: list[SafetyFloor]
+    # EMERGENCY if a rule matched, else the most severe matched floor, else None.
+    minimum_level: TriageLevelId | None
     unknown_symptoms: list[str]
     rules_version: str
 
@@ -148,6 +171,8 @@ def _evaluate(c: Condition, ctx: _NormalizedContext) -> bool:
             return ctx.age_months is not None and ctx.age_months < v
         case AgeMonthsGte(ageMonthsGte=v):
             return ctx.age_months is not None and ctx.age_months >= v
+        case AgeKnown(ageKnown=v):
+            return (ctx.age_months is not None) == v
         case Pregnant(pregnant=v):
             return ctx.pregnant is not None and ctx.pregnant == v
         case TemperatureCGte(temperatureCGte=v):
@@ -188,7 +213,7 @@ class RedFlagEngine:
         self._known = frozenset(ids)
 
         seen: set[str] = set()
-        for rule in self._rule_set.rules:
+        for rule in [*self._rule_set.rules, *self._rule_set.floors]:
             if rule.id in seen:
                 raise ValueError(f"Duplicate red-flag rule id: {rule.id}")
             seen.add(rule.id)
@@ -211,6 +236,10 @@ class RedFlagEngine:
     def rules(self) -> list[RedFlagRule]:
         return list(self._rule_set.rules)
 
+    @property
+    def floors(self) -> list[SafetyFloor]:
+        return list(self._rule_set.floors)
+
     def evaluate(self, ctx: TriageContext) -> RedFlagResult:
         symptoms: set[str] = set()
         unknown: list[str] = []
@@ -228,10 +257,14 @@ class RedFlagEngine:
             temperature_c=_finite_or_none(ctx.temperature_c),
         )
         matched = [r for r in self._rule_set.rules if _evaluate(r.when, norm)]
+        floors = [f for f in self._rule_set.floors if _evaluate(f.when, norm)]
+        floor_level = min((f.minLevel for f in floors), key=TRIAGE_LEVELS.index, default=None)
         return RedFlagResult(
             is_emergency=bool(matched),
             level="EMERGENCY" if matched else None,
             matched_rules=matched,
+            matched_floors=floors,
+            minimum_level="EMERGENCY" if matched else floor_level,
             unknown_symptoms=unknown,
             rules_version=self._rule_set.version,
         )

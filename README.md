@@ -84,16 +84,28 @@ cp edge/.env.example       edge/.env
 # 2. Start the full stack
 docker compose -f infra/docker-compose.yml up --build
 
+# 3. Load demo data (6 villages near Chennai, staff, 18 patients, 80 triage sessions)
+docker compose -f infra/docker-compose.yml exec server node server/dist/seed.js
+
 # ...or just the infrastructure, for local development
 docker compose -f infra/docker-compose.yml up -d mongodb timescaledb mosquitto
 ```
+
+**Demo logins.** Every account uses the password `RuralCare@123`. The seed wipes existing data.
+
+| Role          | Phone                                                                                                                |
+| ------------- | -------------------------------------------------------------------------------------------------------------------- |
+| admin         | 9000000001                                                                                                           |
+| doctor        | 9000000002, 9000000003                                                                                               |
+| health_worker | 9000000011 (Kelambakkam, Thiruporur) · 9000000012 (Uthiramerur, Sriperumbudur) · 9000000013 (Ponneri, Gummidipoondi) |
+| patient       | 9000000021                                                                                                           |
 
 The server, ai-service and client images are built with the **repo root** as their context, so each image can include `/shared`.
 
 | Service      | URL / port                                                              |
 | ------------ | ----------------------------------------------------------------------- |
 | Client (PWA) | http://localhost:8080                                                   |
-| API server   | http://localhost:4000                                                   |
+| API server   | http://localhost:4000 (Swagger UI at `/api/docs`)                       |
 | AI service   | http://localhost:8000 (docs at `/docs`)                                 |
 | MongoDB      | `localhost:27017`                                                       |
 | TimescaleDB  | `localhost:5433` (host port 5433 avoids clashing with a local Postgres) |
@@ -108,9 +120,10 @@ Prerequisites: Node.js ≥ 20.19 (24 recommended) and Python 3.11+.
 ```bash
 # JS/TS: npm workspaces (shared, server, client)
 npm install
-npm run dev:server         # http://localhost:4000
+npm run dev:server         # http://localhost:4000 (needs MongoDB, e.g. the docker one)
+npm run seed -w @ruralcare/server   # load demo data
 npm run dev:client         # http://localhost:5173
-npm test                   # vitest in every workspace
+npm test                   # vitest in every workspace (server tests use an in-memory MongoDB)
 npm run lint && npm run typecheck && npm run format:check
 
 # Python AI service
@@ -128,7 +141,11 @@ GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs all o
 
 ## Safety rules
 
+Full details and deliberate trade-offs are in **[docs/SAFETY.md](docs/SAFETY.md)**.
+
 - This is **triage guidance, not a diagnosis**, and every result screen shows a disclaimer.
 - Red-flag symptoms **always** return `EMERGENCY — call 108 / go to the nearest hospital now`. A deterministic rule engine produces this result, and the ML model is never involved.
 - The rule engine runs **before** the model on every path: offline client, online server, and AI service.
+- If the AI service is unavailable, triage still works on the rules alone. The result is at least `SEE_DOCTOR_SOON` and says that the model was unavailable. It is never a silent `SELF_CARE`.
+- Age is required. If an offline record arrives without age and shows fever, the result is at least `SEE_DOCTOR_24H`.
 - Rule definitions live in a single shared source ([`shared/`](shared/README.md)). The TypeScript and Python engines must both pass the same golden test cases, so the offline and online paths cannot drift apart.

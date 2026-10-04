@@ -139,6 +139,8 @@ sequenceDiagram
 | **Disease → triage-level mapping table**                    | The model predicts conditions. A curated mapping (reviewed and documented) turns those predictions into one of the four triage levels. Low-confidence predictions escalate to `SEE_DOCTOR_SOON`, never to `SELF_CARE`. |
 | **MongoDB for documents, TimescaleDB for vitals**           | Triage sessions are document-shaped. Vitals are high-frequency time-series that benefit from hypertables and `time_bucket` queries.                                                                                    |
 | **Idempotent sync keyed by client-generated UUID**          | Offline devices may retry. Duplicate uploads must be safe.                                                                                                                                                             |
+| **Model-unavailable fallback**                              | If the AI service is down or returns anything invalid, the result comes from the rules alone. It is at least `SEE_DOCTOR_SOON`, carries a notice, and is never `SELF_CARE`.                                            |
+| **Safety floors**                                           | Data-driven minimum levels (e.g. fever + unknown age ⇒ ≥ `SEE_DOCTOR_24H`) that the model can't go below.                                                                                                              |
 | **Server verdict wins**                                     | If the server-side rule check disagrees with the client (e.g. outdated rules on the client), the server result is stored and shown.                                                                                    |
 
 ## 4. Triage levels
@@ -152,11 +154,13 @@ sequenceDiagram
 
 ## Delivery phases
 
-| Phase | Scope                                                                                                                                                                    | Status  |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- |
-| 1     | `/shared` rules, vocabulary and triage levels; TS and Python red-flag engines with shared golden tests; npm workspaces, lint/format, health endpoints, Docker builds, CI | ✅ Done |
-| 2     | Backend API: Mongoose models, JWT + RBAC, Zod validation, `POST /triage`, idempotent `POST /triage/sync`, OpenAPI docs                                                   | ⏳      |
-| 3     | Kaggle dataset, sklearn training, clean + noisy evaluation, ONNX export, disease → triage mapping, FastAPI `/predict`, `docs/MODEL_REPORT.md`                            | ⏳      |
-| 4     | MQTT vitals simulator, server subscriber → TimescaleDB hypertable, threshold alerts, Mosquitto auth                                                                      | ⏳      |
-| 5     | Offline-first PWA: Workbox, symptom checklist, in-browser rules + ONNX, Dexie outbox sync, en/ta/hi, dashboards                                                          | ⏳      |
-| 6     | Kafka, Kubernetes manifests, security hardening, Playwright E2E (incl. offline), Lighthouse, final report                                                                | ⏳      |
+Safety decisions and the Phase 5 form requirements (age required, pregnancy question) are in [SAFETY.md](SAFETY.md).
+
+| Phase | Scope                                                                                                                                                                            | Status  |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| 1     | `/shared` rules, vocabulary and triage levels; TS and Python red-flag engines with shared golden tests; npm workspaces, lint/format, health endpoints, Docker builds, CI         | ✅ Done |
+| 2     | Backend API: Mongoose models, JWT + RBAC, Zod validation, triage with rules-only fallback, idempotent sync, doctor review, dashboard stats, Swagger UI, seed data, safety floors | ✅ Done |
+| 3     | Kaggle dataset, sklearn training, clean + noisy evaluation, ONNX export, disease → triage mapping, FastAPI `/predict`, `docs/MODEL_REPORT.md`                                    | ⏳      |
+| 4     | MQTT vitals simulator, server subscriber → TimescaleDB hypertable, threshold alerts, Mosquitto auth                                                                              | ⏳      |
+| 5     | Offline-first PWA: Workbox, symptom checklist, in-browser rules + ONNX, Dexie outbox sync, en/ta/hi, dashboards                                                                  | ⏳      |
+| 6     | Kafka, Kubernetes manifests, security hardening, Playwright E2E (incl. offline), Lighthouse, final report                                                                        | ⏳      |

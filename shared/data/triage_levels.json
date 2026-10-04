@@ -1,10 +1,18 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "emergencyNumber": "108",
   "disclaimer": {
     "en": "This is triage guidance, not a medical diagnosis. It does not replace a doctor. If you feel worse or are worried, seek medical care.",
     "ta": "இது முதற்கட்ட வழிகாட்டுதல் மட்டுமே, மருத்துவ நோயறிதல் அல்ல. இது மருத்துவருக்கு மாற்றாகாது. உடல்நிலை மோசமானால் அல்லது கவலையாக இருந்தால், மருத்துவ உதவியை நாடுங்கள்.",
     "hi": "यह केवल प्रारंभिक मार्गदर्शन है, चिकित्सकीय निदान नहीं। यह डॉक्टर का विकल्प नहीं है। तबीयत बिगड़े या चिंता हो तो चिकित्सा सहायता लें।"
+  },
+  "modelUnavailable": {
+    "fallbackLevel": "SEE_DOCTOR_SOON",
+    "notice": {
+      "en": "The automatic assessment is unavailable right now, so this result is based on safety rules only. Please consult a health worker or doctor.",
+      "ta": "தானியங்கி மதிப்பீடு இப்போது கிடைக்கவில்லை, எனவே இந்த முடிவு பாதுகாப்பு விதிகளை மட்டுமே அடிப்படையாகக் கொண்டது. சுகாதார பணியாளர் அல்லது மருத்துவரை அணுகவும்.",
+      "hi": "स्वचालित आकलन अभी उपलब्ध नहीं है, इसलिए यह परिणाम केवल सुरक्षा नियमों पर आधारित है। कृपया स्वास्थ्य कार्यकर्ता या डॉक्टर से सलाह लें।"
+    }
   },
   "levels": [
     {

@@ -6,7 +6,13 @@ import type { TriageContext } from './schemas';
 interface GoldenCase {
   name: string;
   input: TriageContext;
-  expected: { isEmergency: boolean; matchedRuleIds: string[]; unknownSymptoms?: string[] };
+  expected: {
+    isEmergency: boolean;
+    matchedRuleIds: string[];
+    unknownSymptoms?: string[];
+    minimumLevel?: string | null;
+    floorIds?: string[];
+  };
 }
 
 // The same file drives ai-service/tests/test_red_flags.py, so both engines must agree.
@@ -19,6 +25,12 @@ describe('red-flag engine golden cases', () => {
     expect(result.matchedRules.map((r) => r.id).sort()).toEqual([...c.expected.matchedRuleIds].sort());
     if (c.expected.unknownSymptoms) {
       expect(result.unknownSymptoms).toEqual(c.expected.unknownSymptoms);
+    }
+    if (c.expected.minimumLevel !== undefined) {
+      expect(result.minimumLevel).toBe(c.expected.minimumLevel);
+    }
+    if (c.expected.floorIds) {
+      expect(result.matchedFloors.map((f) => f.id).sort()).toEqual([...c.expected.floorIds].sort());
     }
   });
 });

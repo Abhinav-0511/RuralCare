@@ -3,7 +3,8 @@ import { defineConfig } from 'tsup';
 // @ruralcare/shared ships TypeScript source + JSON, so it is bundled into the server output.
 // Everything else in node_modules stays external.
 export default defineConfig({
-  entry: ['src/index.ts'],
+  // dist/index.js (API) and dist/seed.js (demo data)
+  entry: { index: 'src/index.ts', seed: 'src/scripts/seed.ts' },
   format: ['esm'],
   platform: 'node',
   target: 'node20',

@@ -2,8 +2,11 @@ import {
   type Condition,
   type RedFlagRule,
   RedFlagRuleSetSchema,
+  type SafetyFloor,
   SymptomVocabularySchema,
   type TriageContext,
+  TRIAGE_LEVELS,
+  type TriageLevelId,
 } from './schemas';
 
 export interface RedFlagResult {
@@ -12,6 +15,13 @@ export interface RedFlagResult {
   level: 'EMERGENCY' | null;
   /** Matched rules, in rule-file order. */
   matchedRules: RedFlagRule[];
+  /** Matched safety floors (minimum levels), in file order. */
+  matchedFloors: SafetyFloor[];
+  /**
+   * The lowest level the final result may have: EMERGENCY if a rule matched, otherwise the
+   * highest matched floor, otherwise null (no constraint).
+   */
+  minimumLevel: TriageLevelId | null;
   /** Input symptoms that are not in the vocabulary (ignored for matching). */
   unknownSymptoms: string[];
   rulesVersion: string;
@@ -20,6 +30,7 @@ export interface RedFlagResult {
 export interface RedFlagEngine {
   readonly rulesVersion: string;
   readonly rules: readonly RedFlagRule[];
+  readonly floors: readonly SafetyFloor[];
   evaluate(ctx: TriageContext): RedFlagResult;
 }
 
@@ -42,6 +53,7 @@ function evaluateCondition(c: Condition, ctx: NormalizedContext): boolean {
   // Missing context values never match: an unknown age can't trigger an infant rule.
   if ('ageMonthsLt' in c) return ctx.ageMonths !== null && ctx.ageMonths < c.ageMonthsLt;
   if ('ageMonthsGte' in c) return ctx.ageMonths !== null && ctx.ageMonths >= c.ageMonthsGte;
+  if ('ageKnown' in c) return (ctx.ageMonths !== null) === c.ageKnown;
   if ('pregnant' in c) return ctx.pregnant !== null && ctx.pregnant === c.pregnant;
   if ('temperatureCGte' in c) return ctx.temperatureC !== null && ctx.temperatureC >= c.temperatureCGte;
   if ('all' in c) return c.all.every((sub) => evaluateCondition(sub, ctx));
@@ -68,7 +80,7 @@ export function createRedFlagEngine(rawRules: unknown, rawVocabulary: unknown): 
   const known = new Set(vocabulary.symptoms.map((s) => s.id));
 
   const ids = new Set<string>();
-  for (const rule of ruleSet.rules) {
+  for (const rule of [...ruleSet.rules, ...ruleSet.floors]) {
     if (ids.has(rule.id)) throw new Error(`Duplicate red-flag rule id: ${rule.id}`);
     ids.add(rule.id);
     for (const s of referencedSymptoms(rule.when)) {
@@ -79,6 +91,7 @@ export function createRedFlagEngine(rawRules: unknown, rawVocabulary: unknown): 
   return {
     rulesVersion: ruleSet.version,
     rules: ruleSet.rules,
+    floors: ruleSet.floors,
     evaluate(input) {
       const symptoms = new Set<string>();
       const unknownSymptoms: string[] = [];
@@ -95,11 +108,18 @@ export function createRedFlagEngine(rawRules: unknown, rawVocabulary: unknown): 
       };
 
       const matchedRules = ruleSet.rules.filter((rule) => evaluateCondition(rule.when, ctx));
+      const matchedFloors = ruleSet.floors.filter((floor) => evaluateCondition(floor.when, ctx));
       const isEmergency = matchedRules.length > 0;
+      // TRIAGE_LEVELS is ordered most -> least severe, so the lowest index wins.
+      const floorLevel = matchedFloors
+        .map((f) => f.minLevel)
+        .sort((a, b) => TRIAGE_LEVELS.indexOf(a) - TRIAGE_LEVELS.indexOf(b))[0];
       return {
         isEmergency,
         level: isEmergency ? 'EMERGENCY' : null,
         matchedRules,
+        matchedFloors,
+        minimumLevel: isEmergency ? 'EMERGENCY' : (floorLevel ?? null),
         unknownSymptoms,
         rulesVersion: ruleSet.version,
       };

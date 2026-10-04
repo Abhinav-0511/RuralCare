@@ -41,6 +41,24 @@ describe('createRedFlagEngine validation (fail closed on bad rule files)', () =>
     expect(() => createRedFlagEngine(bad, symptomsJson)).toThrow();
   });
 
+  it('rejects a safety floor that tries to set EMERGENCY', () => {
+    const bad = {
+      version: 'test',
+      rules: [{ id: 'RF_X', label, when: { anySymptoms: ['chest_pain'] } }],
+      floors: [{ id: 'FLOOR_X', label, minLevel: 'EMERGENCY', when: { anySymptoms: ['cough'] } }],
+    };
+    expect(() => createRedFlagEngine(bad, symptomsJson)).toThrow();
+  });
+
+  it('rejects a safety floor that references an unknown symptom', () => {
+    const bad = {
+      version: 'test',
+      rules: [{ id: 'RF_X', label, when: { anySymptoms: ['chest_pain'] } }],
+      floors: [{ id: 'FLOOR_X', label, minLevel: 'SEE_DOCTOR_24H', when: { anySymptoms: ['nope'] } }],
+    };
+    expect(() => createRedFlagEngine(bad, symptomsJson)).toThrow(/nope/);
+  });
+
   it('rejects a rule missing a translation', () => {
     const bad = rules({ id: 'RF_X', label: { en: 'x', hi: 'x' }, when: { anySymptoms: ['chest_pain'] } });
     expect(() => createRedFlagEngine(bad, symptomsJson)).toThrow();

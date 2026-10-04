@@ -1,6 +1,6 @@
 {
-  "version": "1.0.0",
-  "notes": "Deterministic red-flag rules. Evaluated BEFORE the ML model on every path (client offline, server, ai-service). Any match => EMERGENCY and the model is never called. Each condition object has exactly one key. Leaf conditions: anySymptoms, allSymptoms, ageMonthsLt, ageMonthsGte, pregnant, temperatureCGte. Combinators: all, any. A condition on a missing context value (e.g. age not given) evaluates to false. Thresholds are based on common public guidance and are NOT clinically validated.",
+  "version": "1.1.0",
+  "notes": "Deterministic red-flag rules. Evaluated BEFORE the ML model on every path (client offline, server, ai-service). Any match => EMERGENCY and the model is never called. Each condition object has exactly one key. Leaf conditions: anySymptoms, allSymptoms, ageMonthsLt, ageMonthsGte, ageKnown, pregnant, temperatureCGte. Combinators: all, any. A condition on a missing context value (e.g. age not given) evaluates to false. 'floors' never produce EMERGENCY; they set the minimum level the final result may have (the model can't go below it). Thresholds are based on common public guidance and are NOT clinically validated. See docs/SAFETY.md.",
   "rules": [
     {
       "id": "RF_CHEST_PAIN",
@@ -57,6 +57,19 @@
       "label": { "en": "Bleeding during pregnancy", "ta": "கர்ப்ப காலத்தில் இரத்தப்போக்கு", "hi": "गर्भावस्था में खून आना" },
       "when": {
         "all": [{ "pregnant": true }, { "anySymptoms": ["vaginal_bleeding", "severe_bleeding"] }]
+      }
+    }
+  ],
+  "floors": [
+    {
+      "id": "FLOOR_FEVER_AGE_UNKNOWN",
+      "label": { "en": "Fever with unknown age — needs a doctor within 24 hours", "ta": "வயது தெரியாத நிலையில் காய்ச்சல் — 24 மணி நேரத்திற்குள் மருத்துவர் பார்க்க வேண்டும்", "hi": "उम्र पता नहीं और बुखार है — 24 घंटे के अंदर डॉक्टर को दिखाएं" },
+      "minLevel": "SEE_DOCTOR_24H",
+      "when": {
+        "all": [
+          { "ageKnown": false },
+          { "any": [{ "anySymptoms": ["mild_fever", "high_fever"] }, { "temperatureCGte": 38 }] }
+        ]
       }
     }
   ]
