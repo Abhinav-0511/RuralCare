@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { redFlagEngine } from './data';
-import { evaluateVitalAlerts, vitalsConfig } from './vitals';
+import { ageBandFor, evaluateVitalAlerts, thresholdsFor, vitalsConfig } from './vitals';
 
-const codes = (r: Parameters<typeof evaluateVitalAlerts>[0]) =>
-  evaluateVitalAlerts(r)
+const ADULT = 400;
+const CHILD = 60;
+const INFANT = 6;
+const codes = (r: Parameters<typeof evaluateVitalAlerts>[0], ageMonths: number | null = ADULT) =>
+  evaluateVitalAlerts(r, { ageMonths })
     .map((a) => a.code)
     .sort();
 
-describe('evaluateVitalAlerts', () => {
+describe('evaluateVitalAlerts (adult)', () => {
   it('normal readings raise nothing', () => {
     expect(codes({ heartRate: 80, spo2: 97, temperatureC: 37, systolicBp: 120, diastolicBp: 80 })).toEqual(
       [],
@@ -41,28 +44,69 @@ describe('evaluateVitalAlerts', () => {
   });
 });
 
-describe('critical alerts and red-flag rules agree (adult)', () => {
-  // Every critical threshold, just past its limit, must make triage EMERGENCY via the shared rules.
-  it.each(vitalsConfig.thresholds.filter((t) => t.severity === 'critical').map((t) => [t.code, t] as const))(
-    '%s',
-    (_code, t) => {
-      const value = t.op === 'lt' ? t.value - 1 : t.value;
-      const ctx =
-        t.vital === 'temperatureC'
-          ? { symptoms: [], ageMonths: 400, temperatureC: value }
-          : { symptoms: [], ageMonths: 400, vitals: { [t.vital]: value } };
-      expect(redFlagEngine.evaluate(ctx).isEmergency).toBe(true);
-    },
-  );
+describe('age-aware thresholds', () => {
+  it('uses the red-flag age bands (child < 12 years; unknown age = adult)', () => {
+    expect(ageBandFor(INFANT)).toBe('child');
+    expect(ageBandFor(143)).toBe('child');
+    expect(ageBandFor(144)).toBe('adult');
+    expect(ageBandFor(undefined)).toBe('adult');
+  });
 
-  it('warning thresholds alone do not make triage an emergency', () => {
-    for (const t of vitalsConfig.thresholds.filter((x) => x.severity === 'warning')) {
-      const value = t.op === 'lt' ? t.value - 0.5 : t.value;
-      const ctx =
-        t.vital === 'temperatureC'
-          ? { symptoms: [], ageMonths: 400, temperatureC: value }
-          : { symptoms: [], ageMonths: 400, vitals: { [t.vital]: Math.round(value) } };
-      expect(redFlagEngine.evaluate(ctx).isEmergency, t.code).toBe(false);
-    }
+  it("a baby's normal heart rate does not raise an adult alert", () => {
+    expect(codes({ heartRate: 140 }, INFANT)).toEqual([]);
+    expect(codes({ heartRate: 140 }, ADULT)).toEqual(['HR_HIGH']);
+  });
+
+  it('an adult-normal slow heart rate is critical for a child (and vice versa)', () => {
+    expect(codes({ heartRate: 55 }, CHILD)).toEqual(['HR_CRITICAL_LOW_CHILD']);
+    expect(codes({ heartRate: 55 }, ADULT)).toEqual([]);
+    expect(codes({ heartRate: 185 }, CHILD)).toEqual(['HR_HIGH_CHILD']);
+    expect(codes({ heartRate: 205 }, CHILD)).toEqual(['HR_CRITICAL_HIGH_CHILD']);
+  });
+
+  it('child blood pressure: low threshold is 70, high thresholds fall back to the adult values', () => {
+    expect(codes({ systolicBp: 75 }, CHILD)).toEqual([]);
+    expect(codes({ systolicBp: 65 }, CHILD)).toEqual(['BP_SYSTOLIC_CRITICAL_LOW_CHILD']);
+    expect(codes({ systolicBp: 185 }, CHILD)).toEqual(['BP_SYSTOLIC_CRITICAL']);
+  });
+
+  it('unknown age uses the adult thresholds', () => {
+    expect(codes({ heartRate: 140 }, null)).toEqual(['HR_HIGH']);
+  });
+});
+
+describe('critical alerts and red-flag rules agree, for every age band', () => {
+  const cases = [
+    { band: 'adult', ageMonths: ADULT },
+    { band: 'child', ageMonths: CHILD },
+    { band: 'unknown', ageMonths: undefined },
+  ];
+  const ctxFor = (vital: string, value: number, ageMonths: number | undefined) => ({
+    symptoms: [],
+    ...(ageMonths === undefined ? {} : { ageMonths }),
+    ...(vital === 'temperatureC' ? { temperatureC: value } : { vitals: { [vital]: value } }),
+  });
+
+  for (const { band, ageMonths } of cases) {
+    const thresholds = thresholdsFor(ageMonths);
+    it.each(thresholds.filter((t) => t.severity === 'critical').map((t) => [t.code, t] as const))(
+      `${band}: critical %s triggers a red flag`,
+      (_code, t) => {
+        const value = t.op === 'lt' ? t.value - 1 : t.value;
+        expect(redFlagEngine.evaluate(ctxFor(t.vital, value, ageMonths)).isEmergency).toBe(true);
+      },
+    );
+
+    it(`${band}: warning thresholds alone never make triage an emergency`, () => {
+      for (const t of thresholds.filter((x) => x.severity === 'warning')) {
+        const value = t.op === 'lt' ? t.value - 0.5 : t.value;
+        const v = t.vital === 'temperatureC' ? value : Math.round(value);
+        expect(redFlagEngine.evaluate(ctxFor(t.vital, v, ageMonths)).isEmergency, t.code).toBe(false);
+      }
+    });
+  }
+
+  it('every age band referenced by a threshold is defined', () => {
+    expect(Object.keys(vitalsConfig.ageBands).sort()).toEqual(['adult', 'child']);
   });
 });

@@ -30,6 +30,44 @@ All endpoints except `/health`, `GET /api/villages`, register, login and refresh
 | PATCH          | `/api/alerts/:id` (acknowledge)                           |                                   | own villages  |   ✓    |       |
 | GET            | `/api/model/version`                                      |              public               |               |        |       |
 
+## Triage input (Phase 5 fields)
+
+`input` in `POST /api/triage` and `POST /api/triage/sync` is the shared `TriageContext`. Phase 5 added two optional fields:
+
+| Field          | Type                                   | Used by                                                             |
+| -------------- | -------------------------------------- | ------------------------------------------------------------------- |
+| `durationDays` | integer 0–3650                         | Floor `FLOOR_LONG_DURATION`: ≥ 14 days ⇒ at least `SEE_DOCTOR_SOON` |
+| `severity`     | `"mild"` \| `"moderate"` \| `"severe"` | Floor `FLOOR_SEVERE_SYMPTOMS`: `severe` ⇒ at least `SEE_DOCTOR_24H` |
+
+```jsonc
+{
+  "symptoms": ["cough", "mild_fever"],
+  "ageMonths": 420,
+  "sex": "female",
+  "durationDays": 21,
+  "severity": "moderate",
+  "temperatureC": 38.2, // optional, typed in
+  "vitals": { "spo2": 96, "heartRate": 88 }, // optional, typed in
+}
+```
+
+## Listing triage sessions (`GET /api/triage`)
+
+- `sort=recent` (default): newest first.
+- `sort=urgency`: `EMERGENCY` first, then by level, newest first within a level. The doctor's review queue uses this.
+- Every item in the list includes `patientName` (`null` if the patient can't be found).
+
+## Vitals in a session (`vitalsSource`)
+
+A stored session records where the vitals used for triage came from:
+
+| `vitalsSource` | Meaning                                                                                    |
+| -------------- | ------------------------------------------------------------------------------------------ |
+| `manual`       | Only typed-in vitals.                                                                      |
+| `device`       | Only device readings from the last 30 min.                                                 |
+| `combined`     | Both. For each vital the **more abnormal** of the two values is used (see SAFETY.md §3.6). |
+| `null`         | No vitals.                                                                                 |
+
 ## Triage response
 
 ```jsonc

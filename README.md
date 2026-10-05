@@ -16,16 +16,16 @@ The app supports English, Tamil (தமிழ்) and Hindi (हिन्दी)
 
 ## Architecture at a glance
 
-| Layer          | Tech                                                                                                               | Folder                       |
-| -------------- | ------------------------------------------------------------------------------------------------------------------ | ---------------------------- |
-| Frontend (PWA) | React + TypeScript (Vite), TailwindCSS, vite-plugin-pwa / Workbox, Dexie.js (IndexedDB), onnxruntime-web, i18next  | [`client/`](client/)         |
-| API            | Node.js + Express (TypeScript), Mongoose, JWT + RBAC, Zod                                                          | [`server/`](server/)         |
-| AI service     | Python FastAPI + onnxruntime; scikit-learn → ONNX (skl2onnx) training. See [MODEL_REPORT.md](docs/MODEL_REPORT.md) | [`ai-service/`](ai-service/) |
-| Primary DB     | MongoDB (users, triage sessions, sync records)                                                                     | —                            |
-| Time-series DB | TimescaleDB (PostgreSQL) for patient vitals                                                                        | —                            |
-| Edge           | Eclipse Mosquitto (MQTT, passwords + ACL) + Python vitals simulator                                                | [`edge/`](edge/)             |
-| Infra          | Docker Compose (now), Kafka + Kubernetes (later)                                                                   | [`infra/`](infra/)           |
-| Docs           | Architecture, API docs, report notes                                                                               | [`docs/`](docs/)             |
+| Layer          | Tech                                                                                                                                                                               | Folder                       |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| Frontend (PWA) | React + TypeScript (Vite), TailwindCSS, vite-plugin-pwa / Workbox, Dexie.js (IndexedDB), built-in ONNX interpreter (onnxruntime-web fallback), en/ta/hi. See [PWA.md](docs/PWA.md) | [`client/`](client/)         |
+| API            | Node.js + Express (TypeScript), Mongoose, JWT + RBAC, Zod                                                                                                                          | [`server/`](server/)         |
+| AI service     | Python FastAPI + onnxruntime; scikit-learn → ONNX (skl2onnx) training. See [MODEL_REPORT.md](docs/MODEL_REPORT.md)                                                                 | [`ai-service/`](ai-service/) |
+| Primary DB     | MongoDB (users, triage sessions, sync records)                                                                                                                                     | —                            |
+| Time-series DB | TimescaleDB (PostgreSQL) for patient vitals                                                                                                                                        | —                            |
+| Edge           | Eclipse Mosquitto (MQTT, passwords + ACL) + Python vitals simulator                                                                                                                | [`edge/`](edge/)             |
+| Infra          | Docker Compose (now), Kafka + Kubernetes (later)                                                                                                                                   | [`infra/`](infra/)           |
+| Docs           | Architecture, API docs, report notes                                                                                                                                               | [`docs/`](docs/)             |
 
 The full component diagram and the online and offline data flows are in **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
 
@@ -41,7 +41,7 @@ symptoms ──► RED-FLAG RULE ENGINE ──(red flag hit)──► EMERGENCY 
 
 1. **The rule engine always runs first.** It is deterministic and runs both offline in the browser and online on the server and AI service. Red-flag symptoms skip the ML model entirely:
    chest pain, difficulty breathing, unconsciousness, severe bleeding, stroke signs, seizures, high fever in infants, and bleeding during pregnancy.
-2. **When no red flag is present, the ML model runs.** Offline, it runs in the browser through `onnxruntime-web`. Online, it runs in the FastAPI service.
+2. **When no red flag is present, the ML model runs.** Offline, it runs in the browser on a small built-in ONNX interpreter (onnxruntime-web is downloaded only as a fallback; see [ARCHITECTURE.md §5](docs/ARCHITECTURE.md#5-in-browser-model-runtime-decision) for why). Online, it runs in the FastAPI service.
 3. **Every result shows a disclaimer.** Triage levels are `EMERGENCY`, `SEE_DOCTOR_24H`, `SEE_DOCTOR_SOON` and `SELF_CARE`.
 
 ### Roles
@@ -91,16 +91,11 @@ docker compose -f infra/docker-compose.yml exec server node server/dist/seed.js
 docker compose -f infra/docker-compose.yml up -d mongodb timescaledb mosquitto
 ```
 
-**Vitals demo (MQTT → TimescaleDB → alerts → triage).** After seeding:
+**Vitals demo (MQTT → TimescaleDB → alerts → triage).** No extra setup: the seed (step 3) also provisions the MQTT passwords and ACL for the 5 demo devices. Mosquitto reloads itself when they change, and the edge simulator (started with the stack) waits for them, then publishes a reading every 5 s. Re-seeding rotates the credentials and everything reconnects on its own.
 
 ```bash
-npm install                                          # once, on the host
-npm run devices:provision -w @ruralcare/server       # MQTT passwords + ACL for the 5 seeded devices
-docker compose -f infra/docker-compose.yml restart mosquitto
-docker compose -f infra/docker-compose.yml --profile edge up -d edge-simulator   # readings every 5 s
-
 # Inject an abnormal reading on demand (kinds: python -m simulator kinds)
-docker compose -f infra/docker-compose.yml --profile edge exec edge-simulator \
+docker compose -f infra/docker-compose.yml exec edge-simulator \
   python -m simulator inject --device rc-dev-03 --kind spo2_critical
 ```
 
@@ -152,7 +147,15 @@ python -m venv .venv
 .venv/Scripts/uvicorn app.main:app --reload           # http://localhost:8000/docs
 ```
 
-GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs all of the above and builds the Docker images on every push.
+**End-to-end tests (Playwright).** They drive the Docker stack on a 360 px phone viewport and re-seed the database first. Coverage is listed in [docs/PWA.md](docs/PWA.md#6-end-to-end-tests).
+
+```bash
+docker compose -f infra/docker-compose.yml up -d --build --wait
+npx playwright install chromium        # once
+npm run e2e -w @ruralcare/client       # report: client/playwright-report/
+```
+
+GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs all of the above, including the e2e suite against the full stack, and builds the Docker images on every push.
 
 ---
 

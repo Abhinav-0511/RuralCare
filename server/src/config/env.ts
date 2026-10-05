@@ -39,7 +39,7 @@ const EnvSchema = z
       .default('ruralcare/vitals'),
     // Where `npm run devices:provision` writes Mosquitto's passwd/acl and the simulator's device list.
     MQTT_PROVISION_DIR: z.string().default('../infra/mosquitto/generated'),
-    SIMULATOR_DEVICES_FILE: z.string().default('../edge/devices.json'),
+    SIMULATOR_DEVICES_FILE: z.string().default('../infra/mosquitto/generated/devices.json'),
 
     // Optional: create this admin on startup if no admin exists yet
     SEED_ADMIN_PHONE: z.string().optional(),

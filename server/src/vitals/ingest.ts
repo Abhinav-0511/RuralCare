@@ -1,6 +1,7 @@
 // Turns MQTT messages from vitals devices into TimescaleDB rows and MongoDB alerts.
 import { evaluateVitalAlerts, VitalsSchema } from '@ruralcare/shared';
 import { Types } from 'mongoose';
+import { ageInMonths } from '../lib/dates';
 import mqtt from 'mqtt';
 import { z } from 'zod';
 import { Device } from '../models/device';
@@ -35,6 +36,7 @@ export type IngestResult =
 interface DeviceInfo {
   patientId: string;
   villageId: Types.ObjectId;
+  dateOfBirth: Date;
 }
 
 export function createVitalsHandler(deps: { store: VitalsStore; topicPrefix: string; now?: () => Date }) {
@@ -42,12 +44,20 @@ export function createVitalsHandler(deps: { store: VitalsStore; topicPrefix: str
   const cache = new Map<string, DeviceInfo | null>();
   const cacheExpiry = new Map<string, number>();
 
-  async function lookupDevice(deviceId: string): Promise<DeviceInfo | null> {
-    if ((cacheExpiry.get(deviceId) ?? 0) > Date.now()) return cache.get(deviceId) ?? null;
+  async function lookupDevice(deviceId: string, fresh = false): Promise<DeviceInfo | null> {
+    if (!fresh && (cacheExpiry.get(deviceId) ?? 0) > Date.now()) return cache.get(deviceId) ?? null;
     const device = await Device.findOne({ deviceId, active: true }).lean();
-    const patient = device ? await Patient.findById(device.patientId).select('villageId').lean() : null;
+    const patient = device
+      ? await Patient.findById(device.patientId).select('villageId dateOfBirth').lean()
+      : null;
     const info =
-      device && patient ? { patientId: String(device.patientId), villageId: patient.villageId } : null;
+      device && patient
+        ? {
+            patientId: String(device.patientId),
+            villageId: patient.villageId,
+            dateOfBirth: patient.dateOfBirth,
+          }
+        : null;
     cache.set(deviceId, info);
     cacheExpiry.set(deviceId, Date.now() + DEVICE_CACHE_MS);
     return info;
@@ -77,7 +87,10 @@ export function createVitalsHandler(deps: { store: VitalsStore; topicPrefix: str
       }
 
       // Defence in depth behind the broker ACL: the device must be registered to this patient.
-      const device = await lookupDevice(target.deviceId);
+      let device = await lookupDevice(target.deviceId);
+      // A cached entry may be stale (device re-assigned or newly added): check the database once more.
+      if (!device || device.patientId !== target.patientId)
+        device = await lookupDevice(target.deviceId, true);
       if (!device) return { status: 'rejected', reason: 'unknown or inactive device' };
       if (device.patientId !== target.patientId) {
         return { status: 'rejected', reason: 'device is not assigned to this patient' };
@@ -87,7 +100,8 @@ export function createVitalsHandler(deps: { store: VitalsStore; topicPrefix: str
       const inserted = await deps.store.insert({ ...reading, time, ...target });
       if (!inserted) return { status: 'duplicate' };
 
-      const alerts = evaluateVitalAlerts(reading);
+      // Age-aware thresholds: a baby's normal heart rate must not raise an adult alert.
+      const alerts = evaluateVitalAlerts(reading, { ageMonths: ageInMonths(device.dateOfBirth, time) });
       const openedAlerts = alerts.length
         ? await recordAlerts({
             patientId: new Types.ObjectId(target.patientId),

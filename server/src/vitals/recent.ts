@@ -7,7 +7,7 @@ import {
 } from '@ruralcare/shared';
 import type { VitalsStore } from './store';
 
-export type VitalsSource = 'manual' | 'device';
+export type VitalsSource = 'manual' | 'device' | 'combined';
 
 export interface WithVitals<T> {
   input: T;
@@ -15,25 +15,33 @@ export interface WithVitals<T> {
   vitalsMeasuredAt?: Date;
 }
 
-const severityRank = (vital: AlertVital, value: number) =>
-  Math.max(0, ...evaluateVitalAlerts({ [vital]: value }).map((a) => (a.severity === 'critical' ? 2 : 1)));
+const VITALS = ['heartRate', 'spo2', 'systolicBp', 'diastolicBp'] as const;
+
+const severityRank = (vital: AlertVital, value: number, ageMonths: number | undefined) =>
+  Math.max(
+    0,
+    ...evaluateVitalAlerts({ [vital]: value }, { ageMonths: ageMonths ?? null }).map((a) =>
+      a.severity === 'critical' ? 2 : 1,
+    ),
+  );
 
 /**
- * The value triage should see for one vital: the MOST ABNORMAL reading in the window (by alert
- * severity), otherwise the latest. A brief critical reading followed by normal ones must still reach
- * the red-flag rules (safety over accuracy: a sensor glitch can over-triage, never under-triage).
+ * The value triage should see for one vital: the MOST ABNORMAL candidate (by the patient's
+ * age-aware alert severity); ties keep the earlier candidate. Safety over accuracy: a sensor glitch
+ * or a typo can over-triage, never under-triage.
  */
-export function mostAbnormal(vital: AlertVital, v: { last: number; min: number; max: number }): number {
-  // Candidates in preference order, so ties keep the latest value.
-  return [v.last, v.min, v.max].reduce((best, c) =>
-    severityRank(vital, c) > severityRank(vital, best) ? c : best,
+export function mostAbnormal(vital: AlertVital, candidates: number[], ageMonths?: number): number {
+  if (!candidates.length) throw new Error('mostAbnormal needs at least one value');
+  return candidates.reduce((best, c) =>
+    severityRank(vital, c, ageMonths) > severityRank(vital, best, ageMonths) ? c : best,
   );
 }
 
 /**
- * If the triage input has no vitals, attach the patient's device readings from the last
- * `recentWindowMinutes` before `at`. Vitals typed in by the user win. A TimescaleDB failure never
- * blocks triage: it continues without device vitals.
+ * Combines vitals typed in by the user with the patient's device readings from the last
+ * `recentWindowMinutes` before `at`, taking the WORSE value of each vital (typed-in value first,
+ * then the device's latest, lowest and highest reading). A TimescaleDB failure never blocks triage:
+ * it continues with the typed-in values only.
  */
 export async function attachRecentVitals<T extends TriageContext>(
   input: T,
@@ -41,29 +49,39 @@ export async function attachRecentVitals<T extends TriageContext>(
   at: Date,
   store: VitalsStore | null | undefined,
 ): Promise<WithVitals<T>> {
-  if (input.vitals && Object.keys(input.vitals).length > 0) return { input, vitalsSource: 'manual' };
-  if (!store) return { input, vitalsSource: null };
+  const typed: Partial<Record<AlertVital, number>> = { ...(input.vitals ?? {}) };
+  if (input.temperatureC !== undefined) typed.temperatureC = input.temperatureC;
+  const hasTyped = Object.keys(typed).length > 0;
 
-  try {
-    const from = new Date(at.getTime() - vitalsConfig.recentWindowMinutes * 60_000);
-    const recent = await store.extremes(patientId, from, at);
-    if (!recent) return { input, vitalsSource: null };
-
-    const vitals: Vitals = {};
-    for (const key of ['heartRate', 'spo2', 'systolicBp', 'diastolicBp'] as const) {
-      const v = recent.values[key];
-      if (v) vitals[key] = mostAbnormal(key, v);
+  let device: Awaited<ReturnType<VitalsStore['extremes']>> = null;
+  if (store) {
+    try {
+      const from = new Date(at.getTime() - vitalsConfig.recentWindowMinutes * 60_000);
+      device = await store.extremes(patientId, from, at);
+    } catch (err) {
+      console.error('Could not read recent vitals; continuing with typed-in values only', err);
     }
-    const deviceTemp = recent.values.temperatureC;
-    const temperatureC =
-      input.temperatureC ?? (deviceTemp ? mostAbnormal('temperatureC', deviceTemp) : undefined);
-    return {
-      input: { ...input, vitals, ...(temperatureC !== undefined ? { temperatureC } : {}) },
-      vitalsSource: 'device',
-      vitalsMeasuredAt: recent.measuredAt,
-    };
-  } catch (err) {
-    console.error('Could not read recent vitals; continuing without them', err);
-    return { input, vitalsSource: null };
   }
+  if (!device) return { input, vitalsSource: hasTyped ? 'manual' : null };
+
+  const pick = (vital: AlertVital): number | undefined => {
+    const d = device.values[vital];
+    const candidates = [
+      ...(typed[vital] !== undefined ? [typed[vital]] : []),
+      ...(d ? [d.last, d.min, d.max] : []),
+    ];
+    return candidates.length ? mostAbnormal(vital, candidates, input.ageMonths) : undefined;
+  };
+
+  const vitals: Vitals = {};
+  for (const key of VITALS) {
+    const v = pick(key);
+    if (v !== undefined) vitals[key] = v;
+  }
+  const temperatureC = pick('temperatureC');
+  return {
+    input: { ...input, vitals, ...(temperatureC !== undefined ? { temperatureC } : {}) },
+    vitalsSource: hasTyped ? 'combined' : 'device',
+    vitalsMeasuredAt: device.measuredAt,
+  };
 }

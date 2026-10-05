@@ -24,7 +24,8 @@ import paho.mqtt.client as mqtt
 from simulator.devices import Broker, DeviceConfig, load_devices
 from simulator.vitals import ABNORMAL_KINDS, PatientVitals, abnormal_reading, payload
 
-DEFAULT_DEVICES_FILE = os.environ.get("DEVICES_FILE", "devices.json")
+# Written by the seed into infra/mosquitto/generated/ (mounted at /app/generated in Docker).
+DEFAULT_DEVICES_FILE = os.environ.get("DEVICES_FILE", "../infra/mosquitto/generated/devices.json")
 
 
 def connect(broker: Broker, device: DeviceConfig, suffix: str = "") -> mqtt.Client:
@@ -46,27 +47,52 @@ def publish(client: mqtt.Client, device: DeviceConfig, vitals: dict) -> None:
     print(f"{device.device_id} -> {body}", flush=True)
 
 
+def wait_for_devices(path: str, stop: threading.Event) -> float | None:
+    """Blocks until devices.json exists (the seed writes it). Returns its mtime, or None if stopped."""
+    hinted = False
+    while not stop.is_set():
+        try:
+            return os.stat(path).st_mtime
+        except FileNotFoundError:
+            if not hinted:
+                print(f"Waiting for {path} (it is written when the database is seeded)...", flush=True)
+                hinted = True
+            stop.wait(3)
+    return None
+
+
 def run(args: argparse.Namespace) -> int:
-    broker, devices = load_devices(args.devices)
     stop = threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: stop.set())
     signal.signal(signal.SIGINT, lambda *_: stop.set())
-
     rng = random.Random(args.seed)
-    clients = [(d, connect(broker, d), PatientVitals(random.Random(rng.random()))) for d in devices]
-    print(f"Publishing for {len(clients)} devices every {args.interval}s to {broker.host}:{broker.port}", flush=True)
-    try:
-        while not stop.is_set():
-            for device, client, state in clients:
-                vitals = state.next_normal()
-                if args.abnormal_rate and rng.random() < args.abnormal_rate:
-                    vitals = abnormal_reading(vitals, rng.choice(list(ABNORMAL_KINDS)))
-                publish(client, device, vitals)
-            stop.wait(args.interval + rng.uniform(-0.3, 0.3))
-    finally:
-        for _, client, _ in clients:
-            client.loop_stop()
-            client.disconnect()
+
+    while not stop.is_set():
+        mtime = wait_for_devices(args.devices, stop)
+        if mtime is None:
+            break
+        broker, devices = load_devices(args.devices)
+        clients = [(d, connect(broker, d), PatientVitals(random.Random(rng.random()))) for d in devices]
+        print(
+            f"Publishing for {len(clients)} devices every {args.interval}s to {broker.host}:{broker.port}", flush=True
+        )
+        try:
+            while not stop.is_set():
+                for device, client, state in clients:
+                    vitals = state.next_normal()
+                    if args.abnormal_rate and rng.random() < args.abnormal_rate:
+                        vitals = abnormal_reading(vitals, rng.choice(list(ABNORMAL_KINDS)))
+                    publish(client, device, vitals)
+                stop.wait(args.interval + rng.uniform(-0.3, 0.3))
+                # Re-seeding writes new credentials: reconnect with them.
+                if wait_for_devices(args.devices, stop) != mtime:
+                    print("devices.json changed, reconnecting with the new credentials", flush=True)
+                    stop.wait(2)  # let the broker reload first
+                    break
+        finally:
+            for _, client, _ in clients:
+                client.loop_stop()
+                client.disconnect()
     return 0
 
 

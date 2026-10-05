@@ -55,6 +55,12 @@
     {"name": "vitals: child systolic 78 is not flagged", "input": {"symptoms": [], "ageMonths": 60, "vitals": {"systolicBp": 78}}, "expected": {"isEmergency": false, "matchedRuleIds": []}},
     {"name": "temperature 41.0 => very high temperature", "input": {"symptoms": [], "ageMonths": 400, "temperatureC": 41.0}, "expected": {"isEmergency": true, "matchedRuleIds": ["RF_VERY_HIGH_TEMPERATURE"]}},
     {"name": "temperature 40.9 adult => not an emergency", "input": {"symptoms": ["high_fever"], "ageMonths": 400, "temperatureC": 40.9}, "expected": {"isEmergency": false, "matchedRuleIds": []}},
-    {"name": "several critical vitals at once", "input": {"symptoms": [], "ageMonths": 400, "vitals": {"spo2": 85, "heartRate": 160}}, "expected": {"isEmergency": true, "matchedRuleIds": ["RF_LOW_OXYGEN", "RF_HEART_RATE_EXTREME"]}}
+    {"name": "several critical vitals at once", "input": {"symptoms": [], "ageMonths": 400, "vitals": {"spo2": 85, "heartRate": 160}}, "expected": {"isEmergency": true, "matchedRuleIds": ["RF_LOW_OXYGEN", "RF_HEART_RATE_EXTREME"]}},
+    {"name": "vitals: child systolic 65 => BP extreme", "input": {"symptoms": [], "ageMonths": 60, "vitals": {"systolicBp": 65}}, "expected": {"isEmergency": true, "matchedRuleIds": ["RF_BLOOD_PRESSURE_EXTREME"]}},
+    {"name": "severe symptoms => at least SEE_DOCTOR_24H", "input": {"symptoms": ["cough"], "ageMonths": 400, "severity": "severe"}, "expected": {"isEmergency": false, "matchedRuleIds": [], "floorIds": ["FLOOR_SEVERE_SYMPTOMS"], "minimumLevel": "SEE_DOCTOR_24H"}},
+    {"name": "moderate symptoms => no floor", "input": {"symptoms": ["cough"], "ageMonths": 400, "severity": "moderate"}, "expected": {"isEmergency": false, "matchedRuleIds": [], "floorIds": [], "minimumLevel": null}},
+    {"name": "symptoms for 14 days => at least SEE_DOCTOR_SOON", "input": {"symptoms": ["cough"], "ageMonths": 400, "durationDays": 14}, "expected": {"isEmergency": false, "matchedRuleIds": [], "floorIds": ["FLOOR_LONG_DURATION"], "minimumLevel": "SEE_DOCTOR_SOON"}},
+    {"name": "boundary: 13 days => no floor", "input": {"symptoms": ["cough"], "ageMonths": 400, "durationDays": 13}, "expected": {"isEmergency": false, "matchedRuleIds": [], "floorIds": [], "minimumLevel": null}},
+    {"name": "severe AND long => the more urgent floor wins", "input": {"symptoms": ["cough"], "ageMonths": 400, "durationDays": 30, "severity": "severe"}, "expected": {"isEmergency": false, "matchedRuleIds": [], "floorIds": ["FLOOR_SEVERE_SYMPTOMS", "FLOOR_LONG_DURATION"], "minimumLevel": "SEE_DOCTOR_24H"}}
   ]
 }

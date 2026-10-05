@@ -246,7 +246,7 @@ export const TriageSessionSchema = z
     origin: z.enum(SESSION_ORIGINS),
     occurredAt: z.iso.datetime(),
     input: TriageContextSchema,
-    vitalsSource: z.enum(['manual', 'device']).nullable().optional(),
+    vitalsSource: z.enum(['manual', 'device', 'combined']).nullable().optional(),
     vitalsMeasuredAt: z.iso.datetime().optional(),
     result: z.object({
       level: LevelSchema,
@@ -265,6 +265,7 @@ export const TriageSessionSchema = z
     }),
     clientResult: ClientResultSchema.optional(),
     verdictChanged: z.boolean(),
+    patientName: z.string().nullable().optional().meta({ description: 'Included in lists' }),
     review: z.object({
       status: z.enum(REVIEW_STATUSES),
       reviewedBy: ObjectIdSchema.optional(),
@@ -320,6 +321,10 @@ export const ListSessionsQuerySchema = PaginationQuerySchema.extend({
   reviewStatus: z.enum(REVIEW_STATUSES).optional(),
   from: z.iso.datetime({ offset: true }).optional(),
   to: z.iso.datetime({ offset: true }).optional(),
+  sort: z
+    .enum(['recent', 'urgency'])
+    .default('recent')
+    .meta({ description: '`urgency`: EMERGENCY first, then by level, newest first within a level' }),
 });
 export const SessionListSchema = paginated(TriageSessionSchema).meta({ id: 'TriageSessionList' });
 

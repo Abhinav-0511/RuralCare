@@ -33,3 +33,7 @@ Thumbs.db
 infra/mosquitto/generated/*
 !infra/mosquitto/generated/.gitkeep
 edge/devices.json
+
+# Playwright
+client/test-results/
+client/playwright-report/

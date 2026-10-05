@@ -1,31 +1,81 @@
-import { getDisclaimer, LOCALES, redFlagEngine, symptomVocabulary } from '@ruralcare/shared';
+import { lazy, type ReactNode, Suspense } from 'react';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
+import { Layout } from './components/Layout';
+import { Spinner } from './components/ui';
+import { I18nProvider } from './i18n/I18nProvider';
+import { AuthProvider, useAuth } from './lib/auth';
+import { ConnectivityProvider } from './lib/connectivity';
+import { ModelProvider } from './model/ModelProvider';
+import HistoryPage from './pages/HistoryPage';
+import LoginPage from './pages/LoginPage';
+import ResultPage from './pages/ResultPage';
+import TriageWizard from './pages/TriageWizard';
+import { SyncProvider } from './triage/SyncProvider';
 
-// Phase 1 placeholder: proves the shared rules are bundled into the browser build.
-// The real triage UI arrives in Phase 5.
+// Dashboards (and Recharts) load on demand, keeping the triage path small. The service worker
+// precaches these chunks too, so they still open offline.
+const HealthWorkerPage = lazy(() => import('./pages/HealthWorkerPage'));
+const ReviewPage = lazy(() => import('./pages/ReviewPage'));
+const SessionDetailPage = lazy(() => import('./pages/SessionDetailPage'));
+const PatientPage = lazy(() => import('./pages/PatientPage'));
+const AdminPage = lazy(() => import('./pages/AdminPage'));
+
+function RequireAuth({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
+  return user ? <>{children}</> : <Navigate to="/login" replace />;
+}
+
+function Home() {
+  const { user } = useAuth();
+  const to = { patient: '/triage', health_worker: '/hw', doctor: '/review', admin: '/admin' }[
+    user?.role ?? 'patient'
+  ];
+  return <Navigate to={to} replace />;
+}
+
+export function AppRoutes() {
+  return (
+    <Suspense fallback={<Spinner />}>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route
+          element={
+            <RequireAuth>
+              <Layout />
+            </RequireAuth>
+          }
+        >
+          <Route index element={<Home />} />
+          <Route path="triage" element={<TriageWizard />} />
+          <Route path="result/:clientId" element={<ResultPage />} />
+          <Route path="history" element={<HistoryPage />} />
+          <Route path="hw" element={<HealthWorkerPage />} />
+          <Route path="review" element={<ReviewPage />} />
+          <Route path="sessions/:id" element={<SessionDetailPage />} />
+          <Route path="patients/:id" element={<PatientPage />} />
+          <Route path="me" element={<PatientPage />} />
+          <Route path="admin" element={<AdminPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
+      </Routes>
+    </Suspense>
+  );
+}
+
 export default function App() {
   return (
-    <main className="mx-auto max-w-xl p-6 font-sans text-slate-800">
-      <h1 className="text-3xl font-bold text-teal-700">RuralCare</h1>
-      <p className="mt-1 text-slate-600">Offline-first symptom triage</p>
-
-      <section className="mt-6 rounded-lg border border-slate-200 p-4">
-        <h2 className="font-semibold">Foundation status</h2>
-        <ul className="mt-2 space-y-1 text-sm">
-          <li>
-            Red-flag rules v{redFlagEngine.rulesVersion} ({redFlagEngine.rules.length} rules, running in
-            browser)
-          </li>
-          <li>Symptom vocabulary: {symptomVocabulary.symptoms.length} symptoms</li>
-        </ul>
-      </section>
-
-      <section aria-label="Disclaimer" className="mt-6 space-y-2 rounded-lg bg-amber-50 p-4 text-sm">
-        {LOCALES.map((locale) => (
-          <p key={locale} lang={locale}>
-            {getDisclaimer(locale)}
-          </p>
-        ))}
-      </section>
-    </main>
+    <I18nProvider>
+      <ConnectivityProvider>
+        <AuthProvider>
+          <ModelProvider>
+            <SyncProvider>
+              <BrowserRouter>
+                <AppRoutes />
+              </BrowserRouter>
+            </SyncProvider>
+          </ModelProvider>
+        </AuthProvider>
+      </ConnectivityProvider>
+    </I18nProvider>
   );
 }

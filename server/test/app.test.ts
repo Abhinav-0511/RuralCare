@@ -14,7 +14,10 @@ describe('GET /health', () => {
     expect(res.body).toMatchObject({
       status: 'ok',
       dependencies: { mongodb: 'up', aiService: 'up', timescaledb: 'disabled', mqtt: 'disabled' },
-      shared: { redFlagRulesVersion: redFlagEngine.rulesVersion, safetyFloorCount: 1 },
+      shared: {
+        redFlagRulesVersion: redFlagEngine.rulesVersion,
+        safetyFloorCount: redFlagEngine.floors.length,
+      },
     });
   });
 

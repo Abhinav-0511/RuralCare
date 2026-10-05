@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { Patient } from '../src/models/patient';
 import type { VitalsStore } from '../src/vitals/store';
 import {
   adultInput,
@@ -42,6 +43,16 @@ describe.skipIf(!hasDocker())('recent device vitals in triage', () => {
       deviceId: 'rc-dev-01',
       ...vitals,
     });
+
+  let child: InstanceType<typeof Patient> | null = null;
+  const buildChildPatient = async () => {
+    child = await Patient.create({
+      name: 'Child',
+      sex: 'female',
+      dateOfBirth: new Date(Date.now() - 5 * 365 * 24 * 3600 * 1000),
+      villageId: world.villages.v1._id,
+    });
+  };
 
   beforeEach(async () => {
     world = await buildWorld();
@@ -112,10 +123,56 @@ describe.skipIf(!hasDocker())('recent device vitals in triage', () => {
     expect(ai.calls[0]!.vitals).toEqual({ spo2: 97, heartRate: 76, systolicBp: 124, diastolicBp: 82 });
   });
 
-  it('vitals typed in by the user take precedence over the device', async () => {
+  it('typed-in vs device: the worse value wins (typed-in is worse)', async () => {
     await reading(3, { spo2: 97 });
     const res = await triage(fakeAi(modelSays('SELF_CARE')), adultInput(['cough'], { vitals: { spo2: 87 } }));
-    expect(res.body.session).toMatchObject({ vitalsSource: 'manual', result: { level: 'EMERGENCY' } });
+    expect(res.body.session).toMatchObject({
+      vitalsSource: 'combined',
+      input: { vitals: { spo2: 87 } },
+      result: { level: 'EMERGENCY' },
+    });
+  });
+
+  it('typed-in vs device: the worse value wins (device is worse)', async () => {
+    await reading(3, { spo2: 85, heartRate: 80 });
+    const res = await triage(
+      fakeAi(modelSays('SELF_CARE')),
+      adultInput(['cough'], { vitals: { spo2: 97, heartRate: 82 }, temperatureC: 37 }),
+    );
+    expect(res.body.session).toMatchObject({
+      vitalsSource: 'combined',
+      input: { vitals: { spo2: 85, heartRate: 82 }, temperatureC: 37 },
+      result: { level: 'EMERGENCY', redFlags: ['RF_LOW_OXYGEN'] },
+    });
+  });
+
+  it('typed-in vs device: a typed-in normal temperature does not hide a device fever of 41 °C', async () => {
+    await reading(3, { temperatureC: 41.2 });
+    const res = await triage(fakeAi(modelSays('SELF_CARE')), adultInput(['cough'], { temperatureC: 37.2 }));
+    expect(res.body.session.input.temperatureC).toBe(41.2);
+    expect(res.body.session.result.redFlags).toEqual(['RF_VERY_HIGH_TEMPERATURE']);
+  });
+
+  it('typed-in vitals alone (no device data) are used as they are', async () => {
+    const res = await triage(fakeAi(modelSays('SELF_CARE')), adultInput(['cough'], { vitals: { spo2: 96 } }));
+    expect(res.body.session).toMatchObject({ vitalsSource: 'manual', input: { vitals: { spo2: 96 } } });
+  });
+
+  it("device heart-rate extremes are judged with the patient's age (child)", async () => {
+    await buildChildPatient();
+    await store().insert({
+      time: minutesAgo(4),
+      patientId: child!.id,
+      deviceId: 'rc-dev-09',
+      heartRate: 140,
+    });
+    await store().insert({ time: minutesAgo(2), patientId: child!.id, deviceId: 'rc-dev-09', heartRate: 55 });
+    const res = await request(makeAppWithVitals(store(), fakeAi(modelSays('SELF_CARE'))))
+      .post('/api/triage')
+      .set('Authorization', world.auth.hw1)
+      .send({ patientId: child!.id, input: { symptoms: ['cough'], ageMonths: 60 } });
+    expect(res.body.session.input.vitals.heartRate).toBe(55);
+    expect(res.body.session.result.redFlags).toEqual(['RF_HEART_RATE_EXTREME']);
   });
 
   it('offline sync uses the vitals from the 30 minutes before the session was recorded', async () => {

@@ -89,6 +89,10 @@ export type SymptomVocabulary = z.infer<typeof SymptomVocabularySchema>;
 
 // ───────────────────────────── Red-flag rules ─────────────────────────────
 
+/** How bad the patient says the symptoms are (wizard step). */
+export const SEVERITIES = ['mild', 'moderate', 'severe'] as const;
+export type Severity = (typeof SEVERITIES)[number];
+
 /** Vital signs a rule can test (temperature is the separate top-level `temperatureC`). */
 export const VITAL_KEYS = ['heartRate', 'spo2', 'systolicBp', 'diastolicBp'] as const;
 export type VitalKey = (typeof VITAL_KEYS)[number];
@@ -103,6 +107,8 @@ export type Condition =
   | { ageKnown: boolean }
   | { pregnant: boolean }
   | { temperatureCGte: number }
+  | { durationDaysGte: number }
+  | { severityIn: Severity[] }
   | { vitalLt: VitalComparison }
   | { vitalGte: VitalComparison }
   | { all: Condition[] }
@@ -128,6 +134,8 @@ export const ConditionSchema: z.ZodType<Condition> = z.lazy(() =>
     z.strictObject({ ageKnown: z.boolean() }),
     z.strictObject({ pregnant: z.boolean() }),
     z.strictObject({ temperatureCGte: z.number() }),
+    z.strictObject({ durationDaysGte: z.number().int().nonnegative() }),
+    z.strictObject({ severityIn: z.array(z.enum(SEVERITIES)).min(1) }),
     z.strictObject({ vitalLt: vitalComparison }),
     z.strictObject({ vitalGte: vitalComparison }),
     z.strictObject({ all: z.array(ConditionSchema).min(1) }),
@@ -188,6 +196,9 @@ export const TriageContextSchema = z.object({
   temperatureC: z.number().min(30).max(45).optional(),
   /** Measured vitals (device or manual entry). Critical values trigger red-flag rules. */
   vitals: VitalsSchema.optional(),
+  /** How long the symptoms have lasted. */
+  durationDays: z.number().int().min(0).max(3650).optional(),
+  severity: z.enum(SEVERITIES).optional(),
 });
 export type TriageContext = z.infer<typeof TriageContextSchema>;
 

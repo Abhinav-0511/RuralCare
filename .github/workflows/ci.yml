@@ -2,7 +2,6 @@ name: CI
 
 on:
   push:
-    branches: [main]
   pull_request:
 
 jobs:
@@ -72,4 +71,33 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - run: for d in infra server ai-service client edge; do cp $d/.env.example $d/.env; done
-      - run: docker compose -f infra/docker-compose.yml --profile edge build
+      - run: docker compose -f infra/docker-compose.yml build
+
+  e2e:
+    name: E2E (Playwright, full Docker stack)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: for d in infra server ai-service client edge; do cp $d/.env.example $d/.env; done
+      # The seed (server container, user `node`) writes MQTT credentials into this bind mount,
+      # which the runner's checkout user owns.
+      - run: chmod 0777 infra/mosquitto/generated
+      - run: docker compose -f infra/docker-compose.yml up -d --build --wait
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e -w @ruralcare/client
+      - name: Stack logs
+        if: failure()
+        run: docker compose -f infra/docker-compose.yml logs --no-color --tail=200
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            client/playwright-report/
+            client/test-results/
+          retention-days: 7

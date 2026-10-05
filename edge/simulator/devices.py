@@ -36,7 +36,8 @@ def load_devices(path: str | Path) -> tuple[Broker, list[DeviceConfig]]:
     path = Path(path)
     if not path.exists():
         raise FileNotFoundError(
-            f"{path} not found. Seed the database and run `npm run devices:provision -w @ruralcare/server` first."
+            f"{path} not found. Seed the database first (it writes devices.json), or run "
+            "`npm run devices:provision -w @ruralcare/server`."
         )
     data = json.loads(path.read_text(encoding="utf-8"))
     # MQTT_URL (e.g. mqtt://mosquitto:1883 inside Docker) overrides the URL in the file.

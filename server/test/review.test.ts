@@ -73,6 +73,22 @@ describe('marking a session reviewed', () => {
     expect(pending.body.items.map((s: { id: string }) => s.id)).toEqual([second.body.session.id]);
   });
 
+  it('the review queue can be sorted by urgency (EMERGENCY first) and includes patient names', async () => {
+    await request(app)
+      .post('/api/triage')
+      .set('Authorization', world.auth.hw1)
+      .send({ patientId: world.patients.p1.id, input: adultInput(['chest_pain']) });
+    const res = await request(app)
+      .get('/api/triage?reviewStatus=pending&sort=urgency')
+      .set('Authorization', world.auth.doctor);
+    expect(res.body.items.map((s: { result: { level: string } }) => s.result.level)).toEqual([
+      'EMERGENCY',
+      'SEE_DOCTOR_24H',
+    ]);
+    expect(res.body.items[0].patientName).toBe('Patient One');
+    expect(res.body.items[0].id).toMatch(/^[a-f0-9]{24}$/);
+  });
+
   it('the health worker sees the doctor review on the session', async () => {
     await asDoctor(`/api/triage/${sessionId}/review`, { note: 'Visit PHC tomorrow.' }).expect(200);
     const res = await request(app).get(`/api/triage/${sessionId}`).set('Authorization', world.auth.hw1);

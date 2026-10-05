@@ -8,12 +8,13 @@ flowchart LR
         UI["React + TS UI<br/>Tailwind · i18n (en/ta/hi)"]
         SW["Service Worker<br/>Workbox precache"]
         RE_C["Red-flag Rule Engine<br/>(TS, deterministic)"]
-        ONNX_C["onnxruntime-web<br/>triage model .onnx"]
+        ONNX_C["Built-in ONNX interpreter<br/>(onnxruntime-web fallback)<br/>triage model .onnx"]
         DEX[("IndexedDB<br/>Dexie.js<br/>sessions · outbox · model cache")]
         UI --> RE_C
         RE_C -- "no red flag" --> ONNX_C
         UI <--> DEX
-        SW -. "caches app shell + model" .-> ONNX_C
+        SW -. "precaches app shell + routes" .-> UI
+        ONNX_C -. "model bytes" .-> DEX
     end
 
     subgraph Backend["🖥️ Backend (Docker Compose)"]
@@ -60,10 +61,10 @@ sequenceDiagram
     actor P as Patient / Health worker
     participant UI as PWA (React)
     participant RE as Rule Engine (TS)
-    participant M as ONNX model (browser)
+    participant M as ONNX model (built-in interpreter)
     participant DB as IndexedDB (Dexie)
 
-    P->>UI: Select symptoms (+ age, pregnancy, duration)
+    P->>UI: Select symptoms (+ age, pregnancy, duration, severity, vitals)
     UI->>RE: evaluate(symptoms, context)
     alt Red flag detected
         RE-->>UI: EMERGENCY (source = "rule", ruleId)
@@ -150,12 +151,13 @@ A document per reading would be slow and large in MongoDB, and these time-series
 | **Rule engine runs before the model on every path**         | Safety. Red flags must never depend on probabilistic output. The rules run on the client (offline), on the server (re-check on sync), and in the AI service (defence in depth).                                        |
 | **Single shared rules file**                                | One JSON definition is consumed by both the TS and Python engines, so the offline and online paths can't drift. Golden test cases run against both engines.                                                            |
 | **Structured symptom selection (checklist), not free text** | Works offline, needs no NLP model, translates easily, and maps directly to the model's feature vector.                                                                                                                 |
-| **sklearn → ONNX**                                          | The same model file serves the browser (onnxruntime-web) and the server (onnxruntime in FastAPI). It is small enough to precache.                                                                                      |
+| **sklearn → ONNX**                                          | The same model file serves the browser (built-in interpreter, §5) and the server (onnxruntime in FastAPI). It is small enough to store on the device.                                                                  |
 | **Disease → triage-level mapping table**                    | The model predicts conditions. A curated mapping (reviewed and documented) turns those predictions into one of the four triage levels. Low-confidence predictions escalate to `SEE_DOCTOR_SOON`, never to `SELF_CARE`. |
 | **MongoDB for documents, TimescaleDB for vitals**           | Triage sessions are document-shaped. Vitals are high-frequency time-series that benefit from hypertables and `time_bucket` queries.                                                                                    |
 | **Idempotent sync keyed by client-generated UUID**          | Offline devices may retry. Duplicate uploads must be safe.                                                                                                                                                             |
 | **Model-unavailable fallback**                              | If the AI service is down or returns anything invalid, the result comes from the rules alone. It is at least `SEE_DOCTOR_SOON`, carries a notice, and is never `SELF_CARE`.                                            |
 | **Safety floors**                                           | Data-driven minimum levels (e.g. fever + unknown age ⇒ ≥ `SEE_DOCTOR_24H`) that the model can't go below.                                                                                                              |
+| **Built-in ONNX interpreter in the browser**                | onnxruntime-web's WebAssembly runtime is 3.7 MB gzipped; the model is 27 KB. A tiny interpreter runs the same file, tested to 1e-5 parity. onnxruntime-web is the automatic fallback. See §5.                          |
 | **Server verdict wins**                                     | If the server-side rule check disagrees with the client (e.g. outdated rules on the client), the server result is stored and shown.                                                                                    |
 
 ## 4. Triage levels
@@ -167,15 +169,44 @@ A document per reading would be slow and large in MongoDB, and these time-series
 | `SEE_DOCTOR_SOON` | Book a visit in the next few days         | Model + mapping (also the fallback for low confidence) |
 | `SELF_CARE`       | Home care advice, monitor symptoms        | Model + mapping (high confidence only)                 |
 
+## 5. In-browser model runtime (decision)
+
+**Decision:** offline predictions run on a small built-in ONNX interpreter ([`client/src/model/onnxLite.ts`](../client/src/model/onnxLite.ts)). onnxruntime-web is kept only as an **automatic fallback**. This deviates from the original stack plan (onnxruntime-web as the browser runtime) and was approved for Phase 5.
+
+**Why.** The triage model is a 27 KB logistic regression. onnxruntime-web's smallest WebAssembly build is 14.2 MB, **3.7 MB gzipped**: about 140 times the size of the model it would run. RuralCare targets phones on slow, metered rural connections, where that download takes minutes, costs the user data, and would dominate the offline precache (the whole app shell is ~620 KB raw). The interpreter adds a few KB, reads the **same `.onnx` file** the server uses, and so keeps one model artefact and one source of truth.
+
+**How the fallback works.** The interpreter supports exactly the operators this model needs (`LinearClassifier`, `Normalizer`). Any other operator throws `UnsupportedModelError`; `createPredictor()` ([`modelManager.ts`](../client/src/model/modelManager.ts)) catches it and lazily imports the CPU-only `onnxruntime-web/wasm` build. A future model type (e.g. a tree ensemble) therefore works without code changes. onnxruntime-web is not precached and is downloaded only if that happens.
+
+**How parity is tested** (in `npm test` and CI, against the exact file the PWA serves):
+
+- `client/src/model/onnxLite.test.ts`: interpreter vs scikit-learn `predict_proba` on 112 fixtures exported with the model (`ai-service/models/parity_fixtures.json`), and interpreter vs **onnxruntime-node** (the same ONNX Runtime kernels as onnxruntime-web) on the same batch. Both must agree within **1e-5**. It also checks that rows sum to 1 and that an unsupported file triggers the fallback error.
+- `client/src/model.parity.test.ts`: the served file's sha256 matches its metadata and fixtures; onnxruntime-node reproduces scikit-learn within 1e-5 using the shared `buildFeatureVector()`.
+- `ai-service` pytest: scikit-learn ↔ onnxruntime (Python) on the same fixtures.
+
+Limitation: the onnxruntime-web fallback is not run in a real browser in CI, because the current model never needs it. Its correctness rests on sharing kernels with onnxruntime-node, which is tested.
+
+## 6. Client architecture (Phase 5)
+
+Full details: [PWA.md](PWA.md).
+
+| Layer        | What                                                                                                                                           |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shell        | React 19 + React Router, Tailwind, en/ta/hi. Route-level code splitting; Recharts loaded lazily for dashboards only.                           |
+| Offline      | Workbox service worker (vite-plugin-pwa) precaches the shell and every route. Dexie (IndexedDB): sessions + outbox, patient cache, model.      |
+| Triage       | Wizard → `submitTriage()`: server when online; otherwise shared `decideTriage()` + built-in model on the device, queued for sync.              |
+| Sync         | Outbox → `POST /api/triage/sync` (idempotent by client UUID), backoff 5 s → 5 min; a "server result differs" message when the verdict changes. |
+| Model update | `GET /api/model/version`; download only when the sha256 changes, verify sha256, check it loads, then replace.                                  |
+| Dashboards   | Health worker (patients, triages, alerts), doctor (review queue, emergencies first), patient (vitals charts), admin (stats). Online only.      |
+
 ## Delivery phases
 
-Model evaluation and limitations: [MODEL_REPORT.md](MODEL_REPORT.md). Safety decisions and the Phase 5 form requirements (age required, pregnancy question) are in [SAFETY.md](SAFETY.md).
+Model evaluation and limitations: [MODEL_REPORT.md](MODEL_REPORT.md). Safety decisions and the Phase 5 form requirements (age required, pregnancy question) are in [SAFETY.md](SAFETY.md). The PWA's offline design is in [PWA.md](PWA.md).
 
-| Phase | Scope                                                                                                                                                                                                                                                                                                    | Status  |
-| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| 1     | `/shared` rules, vocabulary and triage levels; TS and Python red-flag engines with shared golden tests; npm workspaces, lint/format, health endpoints, Docker builds, CI                                                                                                                                 | ✅ Done |
-| 2     | Backend API: Mongoose models, JWT + RBAC, Zod validation, triage with rules-only fallback, idempotent sync, doctor review, dashboard stats, Swagger UI, seed data, safety floors                                                                                                                         | ✅ Done |
-| 3     | Kaggle dataset (verified, not committed), dedup + 5-fold CV, clean + noisy evaluation, 3 models compared, tuned logistic regression → 27 KB ONNX, parity sklearn ↔ onnxruntime ↔ onnxruntime-node, conditions + advice in /shared, `/predict`, `/model/version`, real-model seed data                    | ✅ Done |
-| 4     | Mosquitto with passwords + per-device ACL, Python vitals simulator with on-demand abnormal readings, MQTT → TimescaleDB hypertable + hourly continuous aggregate + retention, threshold alerts with acknowledgement, vitals in triage (critical vitals → EMERGENCY via shared rules), vitals/alerts APIs | ✅ Done |
-| 5     | Offline-first PWA: Workbox, symptom checklist, in-browser rules + ONNX, Dexie outbox sync, en/ta/hi, dashboards                                                                                                                                                                                          | ⏳      |
-| 6     | Kafka, Kubernetes manifests, security hardening, Playwright E2E (incl. offline), Lighthouse, final report                                                                                                                                                                                                | ⏳      |
+| Phase | Scope                                                                                                                                                                                                                                                                                                                                                       | Status  |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| 1     | `/shared` rules, vocabulary and triage levels; TS and Python red-flag engines with shared golden tests; npm workspaces, lint/format, health endpoints, Docker builds, CI                                                                                                                                                                                    | ✅ Done |
+| 2     | Backend API: Mongoose models, JWT + RBAC, Zod validation, triage with rules-only fallback, idempotent sync, doctor review, dashboard stats, Swagger UI, seed data, safety floors                                                                                                                                                                            | ✅ Done |
+| 3     | Kaggle dataset (verified, not committed), dedup + 5-fold CV, clean + noisy evaluation, 3 models compared, tuned logistic regression → 27 KB ONNX, parity sklearn ↔ onnxruntime ↔ onnxruntime-node, conditions + advice in /shared, `/predict`, `/model/version`, real-model seed data                                                                       | ✅ Done |
+| 4     | Mosquitto with passwords + per-device ACL, Python vitals simulator with on-demand abnormal readings, MQTT → TimescaleDB hypertable + hourly continuous aggregate + retention, threshold alerts with acknowledgement, vitals in triage (critical vitals → EMERGENCY via shared rules), vitals/alerts APIs                                                    | ✅ Done |
+| 5     | Offline-first PWA: Workbox precache, triage wizard (icons, search, voice), in-browser shared rules + built-in ONNX interpreter (onnxruntime-web fallback), Dexie outbox sync with backoff, en/ta/hi, role dashboards, worse-of device/manual vitals, age-aware alert thresholds, duration/severity floors, Playwright e2e (incl. offline) in CI, Lighthouse | ✅ Done |
+| 6     | Kafka, Kubernetes manifests, security hardening, final report                                                                                                                                                                                                                                                                                               | ⏳      |

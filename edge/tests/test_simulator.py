@@ -13,9 +13,10 @@ THRESHOLDS = json.loads(
 
 
 def alerts(reading: dict) -> dict[str, str]:
-    """Python copy of evaluateVitalAlerts() (shared/src/vitals.ts): code -> severity, worst per vital/direction."""
+    """Python copy of evaluateVitalAlerts() for an adult (shared/src/vitals.ts): code -> severity."""
     best: dict[tuple[str, str], dict] = {}
-    for t in THRESHOLDS:
+    # The simulated devices belong to adult patients: thresholds without a band, or the adult band.
+    for t in (t for t in THRESHOLDS if t.get("ageBand") in (None, "adult")):
         v = reading.get(t["vital"])
         if v is None or not (v < t["value"] if t["op"] == "lt" else v >= t["value"]):
             continue
@@ -106,7 +107,7 @@ def test_rejects_a_mismatched_topic(tmp_path: Path) -> None:
 
 
 def test_missing_file_explains_how_to_provision(tmp_path: Path) -> None:
-    with pytest.raises(FileNotFoundError, match="devices:provision"):
+    with pytest.raises(FileNotFoundError, match="Seed the database"):
         load_devices(tmp_path / "nope.json")
 
 

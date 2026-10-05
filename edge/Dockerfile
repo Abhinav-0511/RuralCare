@@ -1,7 +1,7 @@
-# MQTT vitals simulator. Mount devices.json (from `npm run devices:provision`) at /app/devices.json.
+# MQTT vitals simulator. Mount infra/mosquitto/generated at /app/generated (devices.json is written by the seed).
 FROM python:3.12-slim
 WORKDIR /app
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 DEVICES_FILE=/app/devices.json
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 DEVICES_FILE=/app/generated/devices.json
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY simulator ./simulator

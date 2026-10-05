@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Alert } from '../src/models/alert';
 import { Device } from '../src/models/device';
+import { Patient } from '../src/models/patient';
 import { createVitalsHandler, parseTopic, type VitalsHandler } from '../src/vitals/ingest';
 import { buildWorld, hasDocker, minutesAgo, useTestDb, useVitalsStore, type World } from './helpers';
 
@@ -78,6 +79,26 @@ describe.skipIf(!hasDocker())('vitals ingestion (handler → TimescaleDB + alert
     expect(await send(reading(vitals))).toMatchObject({ alerts: [code] });
   });
 
+  it("uses the patient's age band: a baby's normal heart rate raises nothing", async () => {
+    const baby = await Patient.create({
+      name: 'Baby',
+      sex: 'male',
+      dateOfBirth: new Date(Date.now() - 200 * 24 * 3600 * 1000),
+      villageId: world.villages.v1._id,
+    });
+    await Device.create({ deviceId: 'rc-dev-02', patientId: baby._id });
+    const babyTopic = `${PREFIX}/${baby.id}/rc-dev-02`;
+    expect(await send(reading({ heartRate: 145 }), babyTopic)).toMatchObject({
+      status: 'stored',
+      alerts: [],
+    });
+    expect(await send(reading({ heartRate: 205 }, minutesAgo(1)), babyTopic)).toMatchObject({
+      alerts: ['HR_CRITICAL_HIGH_CHILD'],
+    });
+    // the same 145 bpm for the adult patient is an alert
+    expect(await send(reading({ heartRate: 145 }))).toMatchObject({ alerts: ['HR_HIGH'] });
+  });
+
   it('after acknowledgement, a new breach opens a new alert', async () => {
     await send(reading({ spo2: 88 }, minutesAgo(2)));
     await Alert.updateMany({}, { acknowledged: true });
@@ -103,6 +124,15 @@ describe.skipIf(!hasDocker())('vitals ingestion (handler → TimescaleDB + alert
     ['a bad topic', () => `${PREFIX}/nope`, 'bad topic'],
   ])('rejects %s', async (_name, t, reason) => {
     expect(await send(reading({ spo2: 97 }), t())).toEqual({ status: 'rejected', reason });
+  });
+
+  it('picks up a device re-assignment immediately (no stale cache)', async () => {
+    expect(await send(reading({ spo2: 97 }, minutesAgo(1)))).toMatchObject({ status: 'stored' });
+    await Device.updateOne({ deviceId: 'rc-dev-01' }, { patientId: world.patients.p2._id });
+    const p2Topic = `${PREFIX}/${world.patients.p2.id}/rc-dev-01`;
+    expect(await send(reading({ spo2: 96 }), p2Topic)).toMatchObject({ status: 'stored' });
+    // ...and the old assignment is now rejected
+    expect(await send(reading({ spo2: 95 }, minutesAgo(2)))).toMatchObject({ status: 'rejected' });
   });
 
   it('rejects an inactive device', async () => {

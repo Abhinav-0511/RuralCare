@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { symptomVocabulary } from '@ruralcare/shared';
+import { symptomVocabulary, TRIAGE_LEVELS } from '@ruralcare/shared';
 import { Router } from 'express';
 import { Types } from 'mongoose';
 import type { z } from 'zod';
@@ -121,22 +121,42 @@ export function triageRouter(deps: TriageDeps) {
       ...(q.to ? { $lt: new Date(q.to) } : {}),
     };
     const filter = {
-      ...(q.villageId ? { villageId: q.villageId } : {}),
-      ...(q.patientId ? { patientId: q.patientId } : {}),
+      ...(q.villageId ? { villageId: new Types.ObjectId(q.villageId) } : {}),
+      ...(q.patientId ? { patientId: new Types.ObjectId(q.patientId) } : {}),
       ...(q.level ? { 'result.level': q.level } : {}),
       ...(q.reviewStatus ? { 'review.status': q.reviewStatus } : {}),
       ...(Object.keys(occurredAt).length ? { occurredAt } : {}),
     };
     // Scope is applied with $and so a query param can never widen it.
     const scoped = { $and: [sessionScope(user), filter] };
+    const page = { skip: (q.page - 1) * q.limit, limit: q.limit };
     const [items, total] = await Promise.all([
-      TriageSession.find(scoped)
-        .sort({ occurredAt: -1 })
-        .skip((q.page - 1) * q.limit)
-        .limit(q.limit),
+      q.sort === 'urgency'
+        ? // Doctor review queue: EMERGENCY first (TRIAGE_LEVELS is ordered most -> least severe).
+          TriageSession.aggregate([
+            { $match: scoped },
+            { $addFields: { _urgency: { $indexOfArray: [TRIAGE_LEVELS, '$result.level'] } } },
+            { $sort: { _urgency: 1, occurredAt: -1 } },
+            { $skip: page.skip },
+            { $limit: page.limit },
+            { $project: { _urgency: 0 } },
+          ]).then((docs) => docs.map((d) => TriageSession.hydrate(d)))
+        : TriageSession.find(scoped).sort({ occurredAt: -1 }).skip(page.skip).limit(page.limit),
       TriageSession.countDocuments(scoped),
     ]);
-    res.json({ items: items.map((s) => s.toJSON()), page: q.page, limit: q.limit, total });
+    const names = new Map(
+      (
+        await Patient.find({ _id: { $in: items.map((s) => s.patientId) } })
+          .select('name')
+          .lean()
+      ).map((p) => [String(p._id), p.name]),
+    );
+    res.json({
+      items: items.map((s) => ({ ...s.toJSON(), patientName: names.get(String(s.patientId)) ?? null })),
+      page: q.page,
+      limit: q.limit,
+      total,
+    });
   });
 
   r.get('/:id', async (req, res) => {

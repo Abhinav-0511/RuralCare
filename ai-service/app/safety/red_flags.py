@@ -67,6 +67,14 @@ class TemperatureCGte(_Strict):
     temperatureCGte: float  # noqa: N815
 
 
+class DurationDaysGte(_Strict):
+    durationDaysGte: Annotated[int, Field(ge=0)]  # noqa: N815
+
+
+class SeverityIn(_Strict):
+    severityIn: Annotated[list[Literal["mild", "moderate", "severe"]], Field(min_length=1)]  # noqa: N815
+
+
 class VitalComparison(_Strict):
     """Exactly one vital, e.g. {"spo2": 90}."""
 
@@ -110,6 +118,8 @@ Condition = Union[  # noqa: UP007
     AgeKnown,
     Pregnant,
     TemperatureCGte,
+    DurationDaysGte,
+    SeverityIn,
     VitalLt,
     VitalGte,
     AllOf,
@@ -179,6 +189,8 @@ class TriageContext(BaseModel):
     pregnant: bool | None = None
     temperature_c: Annotated[float, Field(ge=30, le=45)] | None = None
     vitals: Vitals | None = None
+    duration_days: Annotated[int, Field(ge=0, le=3650)] | None = None
+    severity: Literal["mild", "moderate", "severe"] | None = None
 
 
 @dataclass(frozen=True)
@@ -200,6 +212,8 @@ class _NormalizedContext:
     pregnant: bool | None
     temperature_c: float | None
     vitals: dict[str, float]
+    duration_days: float | None
+    severity: str | None
 
 
 def _finite_or_none(n: float | None) -> float | None:
@@ -225,6 +239,10 @@ def _evaluate(c: Condition, ctx: _NormalizedContext) -> bool:
             return (ctx.age_months is not None) == v
         case Pregnant(pregnant=v):
             return ctx.pregnant is not None and ctx.pregnant == v
+        case DurationDaysGte(durationDaysGte=v):
+            return ctx.duration_days is not None and ctx.duration_days >= v
+        case SeverityIn(severityIn=levels):
+            return ctx.severity is not None and ctx.severity in levels
         case VitalLt(vitalLt=cmp):
             key, limit = cmp.item()
             return key in ctx.vitals and ctx.vitals[key] < limit
@@ -316,6 +334,8 @@ class RedFlagEngine:
             age_months=_finite_or_none(ctx.age_months),
             pregnant=ctx.pregnant,
             temperature_c=_finite_or_none(ctx.temperature_c),
+            duration_days=_finite_or_none(ctx.duration_days),
+            severity=ctx.severity,
             vitals={
                 k: float(v)
                 for k, v in (ctx.vitals.model_dump(by_alias=True) if ctx.vitals else {}).items()

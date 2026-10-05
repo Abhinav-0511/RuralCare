@@ -1,6 +1,6 @@
 {
-  "version": "1.3.0",
-  "notes": "Deterministic red-flag rules. Evaluated BEFORE the ML model on every path (client offline, server, ai-service). Any match => EMERGENCY and the model is never called. Each condition object has exactly one key. Leaf conditions: anySymptoms, allSymptoms, ageMonthsLt, ageMonthsGte, ageKnown, pregnant, temperatureCGte, vitalLt/vitalGte (exactly one of heartRate, spo2, systolicBp, diastolicBp, e.g. {\"vitalLt\": {\"spo2\": 90}}). Combinators: all, any. A condition on a missing context value (e.g. age not given) evaluates to false. 'floors' never produce EMERGENCY; they set the minimum level the final result may have (the model can't go below it). Thresholds are based on common public guidance and are NOT clinically validated. See docs/SAFETY.md.",
+  "version": "1.5.0",
+  "notes": "Deterministic red-flag rules. Evaluated BEFORE the ML model on every path (client offline, server, ai-service). Any match => EMERGENCY and the model is never called. Each condition object has exactly one key. Leaf conditions: anySymptoms, allSymptoms, ageMonthsLt, ageMonthsGte, ageKnown, pregnant, temperatureCGte, durationDaysGte, severityIn, vitalLt/vitalGte (exactly one of heartRate, spo2, systolicBp, diastolicBp, e.g. {\"vitalLt\": {\"spo2\": 90}}). Combinators: all, any. A condition on a missing context value (e.g. age not given) evaluates to false. 'floors' never produce EMERGENCY; they set the minimum level the final result may have (the model can't go below it). Thresholds are based on common public guidance and are NOT clinically validated. See docs/SAFETY.md.",
   "rules": [
     {
       "id": "RF_CHEST_PAIN",
@@ -114,7 +114,8 @@
         "any": [
           {"vitalGte": {"systolicBp": 180}},
           {"vitalGte": {"diastolicBp": 120}},
-          {"all": [{"any": [{"ageMonthsGte": 144}, {"ageKnown": false}]}, {"vitalLt": {"systolicBp": 80}}]}
+          {"all": [{"any": [{"ageMonthsGte": 144}, {"ageKnown": false}]}, {"vitalLt": {"systolicBp": 80}}]},
+          {"all": [{"ageMonthsLt": 144}, {"vitalLt": {"systolicBp": 70}}]}
         ]
       }
     },
@@ -140,6 +141,26 @@
       "when": {
         "all": [{"ageKnown": false}, {"any": [{"anySymptoms": ["mild_fever", "high_fever"]}, {"temperatureCGte": 38}]}]
       }
+    },
+    {
+      "id": "FLOOR_SEVERE_SYMPTOMS",
+      "label": {
+        "en": "Symptoms are severe — needs a doctor within 24 hours",
+        "ta": "அறிகுறிகள் கடுமையாக உள்ளன — 24 மணி நேரத்திற்குள் மருத்துவர் பார்க்க வேண்டும்",
+        "hi": "लक्षण गंभीर हैं — 24 घंटे के अंदर डॉक्टर को दिखाएं"
+      },
+      "minLevel": "SEE_DOCTOR_24H",
+      "when": {"severityIn": ["severe"]}
+    },
+    {
+      "id": "FLOOR_LONG_DURATION",
+      "label": {
+        "en": "Symptoms for 2 weeks or more — see a doctor",
+        "ta": "2 வாரங்கள் அல்லது அதற்கு மேல் அறிகுறிகள் — மருத்துவரைப் பாருங்கள்",
+        "hi": "2 हफ्ते या ज़्यादा समय से लक्षण — डॉक्टर को दिखाएं"
+      },
+      "minLevel": "SEE_DOCTOR_SOON",
+      "when": {"durationDaysGte": 14}
     }
   ]
 }

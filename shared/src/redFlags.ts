@@ -7,6 +7,7 @@ import {
   type TriageContext,
   TRIAGE_LEVELS,
   type TriageLevelId,
+  type Severity,
   type VitalKey,
 } from './schemas';
 
@@ -40,6 +41,8 @@ interface NormalizedContext {
   ageMonths: number | null;
   pregnant: boolean | null;
   temperatureC: number | null;
+  durationDays: number | null;
+  severity: Severity | null;
   vitals: Partial<Record<VitalKey, number>>;
 }
 
@@ -68,6 +71,8 @@ function evaluateCondition(c: Condition, ctx: NormalizedContext): boolean {
   if ('ageKnown' in c) return (ctx.ageMonths !== null) === c.ageKnown;
   if ('pregnant' in c) return ctx.pregnant !== null && ctx.pregnant === c.pregnant;
   if ('temperatureCGte' in c) return ctx.temperatureC !== null && ctx.temperatureC >= c.temperatureCGte;
+  if ('durationDaysGte' in c) return ctx.durationDays !== null && ctx.durationDays >= c.durationDaysGte;
+  if ('severityIn' in c) return ctx.severity !== null && c.severityIn.includes(ctx.severity);
   if ('vitalLt' in c) return compareVital(c.vitalLt, ctx, (v, limit) => v < limit);
   if ('vitalGte' in c) return compareVital(c.vitalGte, ctx, (v, limit) => v >= limit);
   if ('all' in c) return c.all.every((sub) => evaluateCondition(sub, ctx));
@@ -119,6 +124,8 @@ export function createRedFlagEngine(rawRules: unknown, rawVocabulary: unknown): 
         ageMonths: finiteOrNull(input.ageMonths),
         pregnant: typeof input.pregnant === 'boolean' ? input.pregnant : null,
         temperatureC: finiteOrNull(input.temperatureC),
+        durationDays: finiteOrNull(input.durationDays),
+        severity: input.severity ?? null,
         vitals: Object.fromEntries(
           Object.entries(input.vitals ?? {}).filter(([, v]) => finiteOrNull(v) !== null),
         ) as Partial<Record<VitalKey, number>>,

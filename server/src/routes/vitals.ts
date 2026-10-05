@@ -1,5 +1,6 @@
 import { evaluateVitalAlerts, vitalsConfig } from '@ruralcare/shared';
 import { Router } from 'express';
+import { ageInMonths } from '../lib/dates';
 import { badRequest, forbidden, HttpError, notFound } from '../lib/httpError';
 import { currentUser } from '../middleware/auth';
 import { Patient } from '../models/patient';
@@ -79,7 +80,7 @@ export function vitalsRouter(deps: { store: VitalsStore | null }) {
       windowMinutes: minutes,
       measuredAt: measuredAt ? measuredAt.toISOString() : null,
       vitals: latest ? values : null,
-      alerts: latest ? evaluateVitalAlerts(values) : [],
+      alerts: latest ? evaluateVitalAlerts(values, { ageMonths: ageInMonths(patient.dateOfBirth) }) : [],
     });
   });
 
