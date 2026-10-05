@@ -7,6 +7,7 @@ import {
   type TriageContext,
   TRIAGE_LEVELS,
   type TriageLevelId,
+  type VitalKey,
 } from './schemas';
 
 export interface RedFlagResult {
@@ -39,6 +40,7 @@ interface NormalizedContext {
   ageMonths: number | null;
   pregnant: boolean | null;
   temperatureC: number | null;
+  vitals: Partial<Record<VitalKey, number>>;
 }
 
 const finiteOrNull = (n: number | null | undefined): number | null =>
@@ -46,6 +48,16 @@ const finiteOrNull = (n: number | null | undefined): number | null =>
 
 /** Lower-cases and trims symptom ids so " Chest_Pain " matches "chest_pain". */
 export const normalizeSymptomId = (s: string): string => s.trim().toLowerCase();
+
+function compareVital(
+  comparison: Partial<Record<VitalKey, number>>,
+  ctx: NormalizedContext,
+  test: (value: number, limit: number) => boolean,
+): boolean {
+  const [key, limit] = Object.entries(comparison)[0] as [VitalKey, number];
+  const value = ctx.vitals[key];
+  return value !== undefined && test(value, limit);
+}
 
 function evaluateCondition(c: Condition, ctx: NormalizedContext): boolean {
   if ('anySymptoms' in c) return c.anySymptoms.some((s) => ctx.symptoms.has(s));
@@ -56,6 +68,8 @@ function evaluateCondition(c: Condition, ctx: NormalizedContext): boolean {
   if ('ageKnown' in c) return (ctx.ageMonths !== null) === c.ageKnown;
   if ('pregnant' in c) return ctx.pregnant !== null && ctx.pregnant === c.pregnant;
   if ('temperatureCGte' in c) return ctx.temperatureC !== null && ctx.temperatureC >= c.temperatureCGte;
+  if ('vitalLt' in c) return compareVital(c.vitalLt, ctx, (v, limit) => v < limit);
+  if ('vitalGte' in c) return compareVital(c.vitalGte, ctx, (v, limit) => v >= limit);
   if ('all' in c) return c.all.every((sub) => evaluateCondition(sub, ctx));
   if ('any' in c) return c.any.some((sub) => evaluateCondition(sub, ctx));
   throw new Error(`Unknown red-flag condition: ${JSON.stringify(c)}`);
@@ -105,6 +119,9 @@ export function createRedFlagEngine(rawRules: unknown, rawVocabulary: unknown): 
         ageMonths: finiteOrNull(input.ageMonths),
         pregnant: typeof input.pregnant === 'boolean' ? input.pregnant : null,
         temperatureC: finiteOrNull(input.temperatureC),
+        vitals: Object.fromEntries(
+          Object.entries(input.vitals ?? {}).filter(([, v]) => finiteOrNull(v) !== null),
+        ) as Partial<Record<VitalKey, number>>,
       };
 
       const matchedRules = ruleSet.rules.filter((rule) => evaluateCondition(rule.when, ctx));

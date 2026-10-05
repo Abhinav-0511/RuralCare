@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Literal, Union
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 from pydantic.alias_generators import to_camel
 
 # Ordered most -> least severe (mirrors TRIAGE_LEVELS in shared/src/schemas.ts).
@@ -67,6 +67,33 @@ class TemperatureCGte(_Strict):
     temperatureCGte: float  # noqa: N815
 
 
+class VitalComparison(_Strict):
+    """Exactly one vital, e.g. {"spo2": 90}."""
+
+    heartRate: float | None = None  # noqa: N815
+    spo2: float | None = None
+    systolicBp: float | None = None  # noqa: N815
+    diastolicBp: float | None = None  # noqa: N815
+
+    @model_validator(mode="after")
+    def _exactly_one(self) -> VitalComparison:
+        if len(self.model_fields_set) != 1:
+            raise ValueError("Compare exactly one vital")
+        return self
+
+    def item(self) -> tuple[str, float]:
+        key = next(iter(self.model_fields_set))
+        return key, getattr(self, key)
+
+
+class VitalLt(_Strict):
+    vitalLt: VitalComparison  # noqa: N815
+
+
+class VitalGte(_Strict):
+    vitalGte: VitalComparison  # noqa: N815
+
+
 class AllOf(_Strict):
     all: Annotated[list[Condition], Field(min_length=1)]
 
@@ -76,7 +103,17 @@ class AnyOf(_Strict):
 
 
 Condition = Union[  # noqa: UP007
-    AnySymptoms, AllSymptoms, AgeMonthsLt, AgeMonthsGte, AgeKnown, Pregnant, TemperatureCGte, AllOf, AnyOf
+    AnySymptoms,
+    AllSymptoms,
+    AgeMonthsLt,
+    AgeMonthsGte,
+    AgeKnown,
+    Pregnant,
+    TemperatureCGte,
+    VitalLt,
+    VitalGte,
+    AllOf,
+    AnyOf,
 ]
 AllOf.model_rebuild()
 AnyOf.model_rebuild()
@@ -120,6 +157,17 @@ class SymptomVocabulary(_Strict):
 # ───────────── Engine input / output ─────────────
 
 
+class Vitals(BaseModel):
+    """Mirrors VitalsSchema in shared/src/schemas.ts (plausible ranges)."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, extra="forbid")
+
+    heart_rate: Annotated[int, Field(ge=20, le=250)] | None = None
+    spo2: Annotated[int, Field(ge=50, le=100)] | None = None
+    systolic_bp: Annotated[int, Field(ge=50, le=260)] | None = None
+    diastolic_bp: Annotated[int, Field(ge=30, le=160)] | None = None
+
+
 class TriageContext(BaseModel):
     """Patient context. Mirrors TriageContextSchema in shared/src/schemas.ts (camelCase in JSON)."""
 
@@ -130,6 +178,7 @@ class TriageContext(BaseModel):
     sex: Literal["female", "male", "other"] | None = None
     pregnant: bool | None = None
     temperature_c: Annotated[float, Field(ge=30, le=45)] | None = None
+    vitals: Vitals | None = None
 
 
 @dataclass(frozen=True)
@@ -150,6 +199,7 @@ class _NormalizedContext:
     age_months: float | None
     pregnant: bool | None
     temperature_c: float | None
+    vitals: dict[str, float]
 
 
 def _finite_or_none(n: float | None) -> float | None:
@@ -175,6 +225,12 @@ def _evaluate(c: Condition, ctx: _NormalizedContext) -> bool:
             return (ctx.age_months is not None) == v
         case Pregnant(pregnant=v):
             return ctx.pregnant is not None and ctx.pregnant == v
+        case VitalLt(vitalLt=cmp):
+            key, limit = cmp.item()
+            return key in ctx.vitals and ctx.vitals[key] < limit
+        case VitalGte(vitalGte=cmp):
+            key, limit = cmp.item()
+            return key in ctx.vitals and ctx.vitals[key] >= limit
         case TemperatureCGte(temperatureCGte=v):
             return ctx.temperature_c is not None and ctx.temperature_c >= v
         case AllOf(all=subs):
@@ -260,6 +316,11 @@ class RedFlagEngine:
             age_months=_finite_or_none(ctx.age_months),
             pregnant=ctx.pregnant,
             temperature_c=_finite_or_none(ctx.temperature_c),
+            vitals={
+                k: float(v)
+                for k, v in (ctx.vitals.model_dump(by_alias=True) if ctx.vitals else {}).items()
+                if _finite_or_none(v) is not None
+            },
         )
         matched = [r for r in self._rule_set.rules if _evaluate(r.when, norm)]
         floors = [f for f in self._rule_set.floors if _evaluate(f.when, norm)]

@@ -19,6 +19,13 @@ describe('seedDemoData', () => {
     expect(await User.countDocuments({ role: 'health_worker' })).toBe(3);
     expect(await User.countDocuments({ role: 'doctor' })).toBe(2);
     expect(await User.countDocuments({ role: 'admin' })).toBe(1);
+    expect(summary.devices.map((d) => d.deviceId)).toEqual([
+      'rc-dev-01',
+      'rc-dev-02',
+      'rc-dev-03',
+      'rc-dev-04',
+      'rc-dev-05',
+    ]);
 
     // Every seeded session respects the safety rules.
     const sessions = await TriageSession.find();

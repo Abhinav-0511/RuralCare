@@ -64,7 +64,9 @@ def test_low_confidence_never_self_care(app, client: TestClient) -> None:
     """Symptom pairs whose top condition is SELF_CARE but below the threshold must not get SELF_CARE."""
     predictor = app.state.predictor
     found = 0
-    for pair in itertools.combinations(predictor.metadata.features[:60], 2):
+    # Red-flag symptoms are excluded: they make the rules answer EMERGENCY before the model runs.
+    safe = [f for f in predictor.metadata.features if f not in app.state.red_flags.red_flag_symptoms]
+    for pair in itertools.combinations(safe[:60], 2):
         ranking = predictor.rank(pair)
         top = ranking.ranked[0]
         is_self_care = CONDITIONS.get(top.id).triageLevel == "SELF_CARE"

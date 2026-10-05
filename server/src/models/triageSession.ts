@@ -42,6 +42,9 @@ export interface TriageSessionFields {
   origin: (typeof SESSION_ORIGINS)[number];
   occurredAt: Date;
   input: TriageContext;
+  /** Where input.vitals came from: typed in by the user, or the patient's device (last 30 min). */
+  vitalsSource?: 'manual' | 'device' | null;
+  vitalsMeasuredAt?: Date;
   result: SessionResult;
   clientResult?: { level: TriageLevelId; source: TriageSource; rulesVersion: string; modelVersion?: string };
   verdictChanged: boolean;
@@ -82,7 +85,15 @@ const triageSessionSchema = new Schema<TriageSessionFields>(
       sex: { type: String, enum: SEXES },
       pregnant: Boolean,
       temperatureC: Number,
+      vitals: {
+        heartRate: Number,
+        spo2: Number,
+        systolicBp: Number,
+        diastolicBp: Number,
+      },
     },
+    vitalsSource: { type: String, enum: ['manual', 'device', null], default: null },
+    vitalsMeasuredAt: Date,
 
     /** The server's verdict (always wins over the client's). */
     result: {

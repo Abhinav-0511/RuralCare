@@ -36,6 +36,16 @@ describe('createRedFlagEngine validation (fail closed on bad rule files)', () =>
     expect(() => createRedFlagEngine(bad, symptomsJson)).toThrow();
   });
 
+  it('rejects a vital comparison with zero, two or unknown vitals', () => {
+    for (const when of [
+      { vitalLt: {} },
+      { vitalLt: { spo2: 90, heartRate: 40 } },
+      { vitalLt: { pulse: 40 } },
+    ]) {
+      expect(() => createRedFlagEngine(rules({ id: 'RF_X', label, when }), symptomsJson)).toThrow();
+    }
+  });
+
   it('rejects an empty symptom list', () => {
     const bad = rules({ id: 'RF_X', label, when: { anySymptoms: [] } });
     expect(() => createRedFlagEngine(bad, symptomsJson)).toThrow();

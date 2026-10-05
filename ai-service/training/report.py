@@ -68,6 +68,23 @@ def confusion(y: np.ndarray, pred: np.ndarray, n: int) -> np.ndarray:
     return cm
 
 
+DENGUE_EXAMPLE = ["high_fever", "joint_pain", "pain_behind_the_eyes", "skin_rash"]
+
+
+def dengue_example(model, data, conditions) -> tuple[list[tuple[str, float]], str, bool]:
+    """Top-3 conditions and final policy level for DENGUE_EXAMPLE (adult, no red flags)."""
+    from app.model.policy import RankedCondition, prediction_level
+
+    x = np.zeros((1, len(data.features)), dtype=np.float32)
+    for sid in DENGUE_EXAMPLE:
+        x[0, data.features.index(sid)] = 1
+    probs = model.predict_proba(x)[0]
+    order = np.argsort(-probs, kind="stable")
+    ranked = [RankedCondition(data.classes[i], float(probs[i])) for i in order]
+    result = prediction_level(ranked, len(DENGUE_EXAMPLE), [], conditions)
+    return [(r.id, r.probability) for r in ranked[:3]], result.level, result.low_confidence
+
+
 def write_report(
     docs_dir: Path,
     *,
@@ -132,7 +149,8 @@ def write_report(
     w(
         "> ⚠️ **This model is not a diagnosis tool and is not clinically validated.** It suggests *possible* "
         "conditions to support triage. Red-flag symptoms are handled by deterministic rules before the model "
-        "runs (see [SAFETY.md](SAFETY.md))."
+        "runs (see [SAFETY.md](SAFETY.md)). The condition-to-triage table must be reviewed by a doctor before "
+        "any real use."
     )
     w("")
     w("## 1. Summary")
@@ -360,8 +378,20 @@ def write_report(
         "records. Real-world accuracy will be lower than anything reported here."
     )
     w(
-        "- **Not clinically validated.** Neither the model, the condition list nor the condition-to-triage "
-        "mapping has been reviewed by clinicians or tested prospectively."
+        "- **Not clinically validated: needs review by a doctor before any real use.** Neither the model nor "
+        "the condition-to-triage table (`shared/data/conditions.json`: which of the 41 conditions maps to "
+        "SEE_DOCTOR_24H, SEE_DOCTOR_SOON or SELF_CARE) has been reviewed by clinicians or tested "
+        "prospectively. The table is the developer's judgement, made for this student project."
+    )
+    top3, ex_level, ex_low = dengue_example(chosen["final"], data, conditions)
+    shown = ", ".join(f"{conditions.get(c).name.en} {p:.2f}" for c, p in top3)
+    w(
+        "- **Known confusion: dengue vs impetigo.** Skin rash is a strong impetigo symptom, so it pulls "
+        "dengue-like presentations towards impetigo. Example: fever, joint pain, pain behind the eyes and skin "
+        f"rash gives **{shown}**. Because the top probability is below {conditions.policy.minConfidence} "
+        f"(low confidence: {'yes' if ex_low else 'no'}), and dengue (SEE_DOCTOR_24H) is the top condition, "
+        f"**the policy still returns {ex_level}**. The wrong runner-up doesn't lower the level, but the "
+        "possible-conditions list shown to the user includes impetigo."
     )
     w(
         "- **Not a diagnosis tool.** The output lists *possible* conditions to guide triage. "

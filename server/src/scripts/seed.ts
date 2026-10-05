@@ -37,3 +37,7 @@ console.log(
 console.log(`Model: ${version?.modelVersion ?? 'unavailable (rules-only fallback)'}`);
 console.log(`\nDemo logins (password for all: ${DEMO_PASSWORD})`);
 console.table(summary.credentials);
+console.log(
+  '\nVitals devices (next: npm run devices:provision -w @ruralcare/server, then restart mosquitto):',
+);
+console.table(summary.devices);

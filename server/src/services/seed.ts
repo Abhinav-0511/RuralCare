@@ -3,11 +3,13 @@
 import { randomUUID } from 'node:crypto';
 import { type Sex, type TriageContext } from '@ruralcare/shared';
 import bcrypt from 'bcryptjs';
-import type { Types } from 'mongoose';
+import type { HydratedDocument, Types } from 'mongoose';
 import { ageInMonths } from '../lib/dates';
-import { Patient } from '../models/patient';
+import { Patient, type PatientFields } from '../models/patient';
 import { TriageSession } from '../models/triageSession';
 import { User } from '../models/user';
+import { Alert } from '../models/alert';
+import { Device } from '../models/device';
 import { Village } from '../models/village';
 import type { AiClient } from './aiClient';
 import { decisionToResult, evaluateTriage } from './triageService';
@@ -61,6 +63,14 @@ const PATIENTS: DemoPatient[] = [
   { name: 'Ramya Devi', sex: 'female', age: { years: 24 }, village: 5 },
   { name: 'Palani Samy', sex: 'male', age: { years: 62 }, village: 5 },
   { name: 'Gowri Shankar', sex: 'female', age: { years: 38 }, village: 5 },
+];
+
+const DEVICE_PATIENTS = [
+  'Lakshmi Murugan',
+  'Arumugam Pillai',
+  'Janaki Ammal',
+  'Selvi Ganesan',
+  'Palani Samy',
 ];
 
 interface Scenario {
@@ -140,6 +150,7 @@ export interface SeedSummary {
   users: number;
   patients: number;
   sessions: number;
+  devices: { deviceId: string; patientName: string }[];
   credentials: { role: string; name: string; phone: string }[];
 }
 
@@ -160,6 +171,8 @@ export async function seedDemoData(options: {
     User.deleteMany({}),
     Patient.deleteMany({}),
     TriageSession.deleteMany({}),
+    Device.deleteMany({}),
+    Alert.deleteMany({}),
   ]);
 
   const villages = await Village.insertMany(VILLAGES);
@@ -176,7 +189,7 @@ export async function seedDemoData(options: {
     staff.find((u) => u.role === 'health_worker' && u.villageIds.some((v) => v.equals(villageId)))!;
   const doctors = staff.filter((u) => u.role === 'doctor');
 
-  const patients = [];
+  const patients: { demo: DemoPatient; doc: HydratedDocument<PatientFields> }[] = [];
   const credentials: SeedSummary['credentials'] = STAFF.map((s) => ({
     role: s.role,
     name: s.name,
@@ -257,7 +270,17 @@ export async function seedDemoData(options: {
   }
   await TriageSession.insertMany(sessions);
 
+  // One home vitals device for an adult patient in five of the villages (MQTT simulator in /edge).
+  const devices = await Device.insertMany(
+    DEVICE_PATIENTS.map((name, i) => ({
+      deviceId: `rc-dev-0${i + 1}`,
+      patientId: patients.find((p) => p.demo.name === name)!.doc._id,
+      label: `Home vitals monitor ${i + 1}`,
+    })),
+  );
+
   return {
+    devices: devices.map((d, i) => ({ deviceId: d.deviceId, patientName: DEVICE_PATIENTS[i]! })),
     villages: villages.length,
     users: staff.length + credentials.filter((c) => c.role === 'patient').length,
     patients: patients.length,

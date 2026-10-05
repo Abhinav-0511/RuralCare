@@ -37,6 +37,24 @@
     {"name": "floor: 37.5C, age unknown, no fever is not floored", "input": {"symptoms": ["headache"], "temperatureC": 37.5}, "expected": {"isEmergency": false, "matchedRuleIds": [], "minimumLevel": null, "floorIds": []}},
     {"name": "floor: no fever, age unknown is not floored", "input": {"symptoms": ["cough", "runny_nose"]}, "expected": {"isEmergency": false, "matchedRuleIds": [], "minimumLevel": null, "floorIds": []}},
     {"name": "floor: fever with age known (adult) is not floored", "input": {"symptoms": ["mild_fever"], "ageMonths": 240}, "expected": {"isEmergency": false, "matchedRuleIds": [], "minimumLevel": null, "floorIds": []}},
-    {"name": "floor + red flag: fever, age unknown, chest pain => EMERGENCY", "input": {"symptoms": ["high_fever", "chest_pain"]}, "expected": {"isEmergency": true, "matchedRuleIds": ["RF_CHEST_PAIN"], "minimumLevel": "EMERGENCY", "floorIds": ["FLOOR_FEVER_AGE_UNKNOWN"]}}
+    {"name": "floor + red flag: fever, age unknown, chest pain => EMERGENCY", "input": {"symptoms": ["high_fever", "chest_pain"]}, "expected": {"isEmergency": true, "matchedRuleIds": ["RF_CHEST_PAIN"], "minimumLevel": "EMERGENCY", "floorIds": ["FLOOR_FEVER_AGE_UNKNOWN"]}},
+    {"name": "confusion (altered_sensorium)", "input": {"symptoms": ["altered_sensorium", "headache"]}, "expected": {"isEmergency": true, "matchedRuleIds": ["RF_CONFUSION"]}},
+    {"name": "coughing blood (blood_in_sputum)", "input": {"symptoms": ["blood_in_sputum", "cough"]}, "expected": {"isEmergency": true, "matchedRuleIds": ["RF_COUGHING_BLOOD"]}},
+    {"name": "vitals: SpO2 89 => low oxygen", "input": {"symptoms": ["cough"], "ageMonths": 400, "vitals": {"spo2": 89}}, "expected": {"isEmergency": true, "matchedRuleIds": ["RF_LOW_OXYGEN"]}},
+    {"name": "vitals boundary: SpO2 exactly 90 is not an emergency", "input": {"symptoms": [], "ageMonths": 400, "vitals": {"spo2": 90}}, "expected": {"isEmergency": false, "matchedRuleIds": []}},
+    {"name": "vitals: normal set => no red flag", "input": {"symptoms": ["cough"], "ageMonths": 400, "vitals": {"spo2": 97, "heartRate": 82, "systolicBp": 124, "diastolicBp": 80}}, "expected": {"isEmergency": false, "matchedRuleIds": []}},
+    {"name": "vitals: adult heart rate 150 => extreme", "input": {"symptoms": [], "ageMonths": 400, "vitals": {"heartRate": 150}}, "expected": {"isEmergency": true, "matchedRuleIds": ["RF_HEART_RATE_EXTREME"]}},
+    {"name": "vitals: adult heart rate 149 => ok", "input": {"symptoms": [], "ageMonths": 400, "vitals": {"heartRate": 149}}, "expected": {"isEmergency": false, "matchedRuleIds": []}},
+    {"name": "vitals: adult heart rate 38 => extreme", "input": {"symptoms": [], "ageMonths": 400, "vitals": {"heartRate": 38}}, "expected": {"isEmergency": true, "matchedRuleIds": ["RF_HEART_RATE_EXTREME"]}},
+    {"name": "vitals: infant heart rate 160 is normal", "input": {"symptoms": [], "ageMonths": 6, "vitals": {"heartRate": 160}}, "expected": {"isEmergency": false, "matchedRuleIds": []}},
+    {"name": "vitals: infant heart rate 205 => extreme", "input": {"symptoms": [], "ageMonths": 6, "vitals": {"heartRate": 205}}, "expected": {"isEmergency": true, "matchedRuleIds": ["RF_HEART_RATE_EXTREME"]}},
+    {"name": "vitals: age unknown, heart rate 155 => adult thresholds apply", "input": {"symptoms": [], "vitals": {"heartRate": 155}}, "expected": {"isEmergency": true, "matchedRuleIds": ["RF_HEART_RATE_EXTREME"]}},
+    {"name": "vitals: systolic 182 => BP extreme", "input": {"symptoms": [], "ageMonths": 600, "vitals": {"systolicBp": 182, "diastolicBp": 100}}, "expected": {"isEmergency": true, "matchedRuleIds": ["RF_BLOOD_PRESSURE_EXTREME"]}},
+    {"name": "vitals: diastolic 120 => BP extreme", "input": {"symptoms": [], "ageMonths": 600, "vitals": {"systolicBp": 170, "diastolicBp": 120}}, "expected": {"isEmergency": true, "matchedRuleIds": ["RF_BLOOD_PRESSURE_EXTREME"]}},
+    {"name": "vitals: adult systolic 78 => BP extreme (shock)", "input": {"symptoms": [], "ageMonths": 600, "vitals": {"systolicBp": 78}}, "expected": {"isEmergency": true, "matchedRuleIds": ["RF_BLOOD_PRESSURE_EXTREME"]}},
+    {"name": "vitals: child systolic 78 is not flagged", "input": {"symptoms": [], "ageMonths": 60, "vitals": {"systolicBp": 78}}, "expected": {"isEmergency": false, "matchedRuleIds": []}},
+    {"name": "temperature 41.0 => very high temperature", "input": {"symptoms": [], "ageMonths": 400, "temperatureC": 41.0}, "expected": {"isEmergency": true, "matchedRuleIds": ["RF_VERY_HIGH_TEMPERATURE"]}},
+    {"name": "temperature 40.9 adult => not an emergency", "input": {"symptoms": ["high_fever"], "ageMonths": 400, "temperatureC": 40.9}, "expected": {"isEmergency": false, "matchedRuleIds": []}},
+    {"name": "several critical vitals at once", "input": {"symptoms": [], "ageMonths": 400, "vitals": {"spo2": 85, "heartRate": 160}}, "expected": {"isEmergency": true, "matchedRuleIds": ["RF_LOW_OXYGEN", "RF_HEART_RATE_EXTREME"]}}
   ]
 }

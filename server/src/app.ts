@@ -10,13 +10,16 @@ import { authenticate } from './middleware/auth';
 import { createErrorHandler, notFoundHandler } from './middleware/errorHandler';
 import { buildOpenApiDocument } from './openapi';
 import { authRouter } from './routes/auth';
+import { alertsRouter } from './routes/alerts';
 import { dashboardRouter } from './routes/dashboard';
 import { modelRouter } from './routes/model';
 import { patientsRouter } from './routes/patients';
 import { triageRouter } from './routes/triage';
 import { usersRouter } from './routes/users';
 import { villagesRouter } from './routes/villages';
+import { vitalsRouter } from './routes/vitals';
 import type { AiClient } from './services/aiClient';
+import type { VitalsStore } from './vitals/store';
 
 const startedAt = Date.now();
 
@@ -32,9 +35,13 @@ export interface AppDeps {
     | 'JWT_REFRESH_TTL'
   >;
   ai: AiClient;
+  /** TimescaleDB vitals store; null/undefined disables vitals (503) and device vitals in triage. */
+  vitals?: VitalsStore | null;
+  /** MQTT ingestion status for /health. */
+  mqttConnected?: () => boolean;
 }
 
-export function createApp({ env, ai }: AppDeps) {
+export function createApp({ env, ai, vitals = null, mqttConnected }: AppDeps) {
   const app = express();
   const tokens = createTokenService(env);
   const requireAuth = authenticate(tokens);
@@ -46,13 +53,22 @@ export function createApp({ env, ai }: AppDeps) {
 
   app.get('/health', async (_req, res) => {
     const db = isDbConnected();
-    const aiUp = await ai.isHealthy();
+    const [aiUp, tsdbUp] = await Promise.all([
+      ai.isHealthy(),
+      vitals ? vitals.ping() : Promise.resolve(null),
+    ]);
     // 503 only when the database is down; the API still works without the AI service.
     res.status(db ? 200 : 503).json({
       status: db ? 'ok' : 'degraded',
       service: 'ruralcare-server',
       uptimeSeconds: Math.round((Date.now() - startedAt) / 1000),
-      dependencies: { mongodb: db ? 'up' : 'down', aiService: aiUp ? 'up' : 'down' },
+      // Only MongoDB is required; the others degrade gracefully (rules-only triage, no vitals).
+      dependencies: {
+        mongodb: db ? 'up' : 'down',
+        aiService: aiUp ? 'up' : 'down',
+        timescaledb: tsdbUp === null ? 'disabled' : tsdbUp ? 'up' : 'down',
+        mqtt: mqttConnected ? (mqttConnected() ? 'up' : 'down') : 'disabled',
+      },
       shared: {
         redFlagRulesVersion: redFlagEngine.rulesVersion,
         redFlagRuleCount: redFlagEngine.rules.length,
@@ -76,7 +92,9 @@ export function createApp({ env, ai }: AppDeps) {
   app.use('/api/model', modelRouter({ ai }));
   app.use('/api/users', requireAuth, usersRouter({ env }));
   app.use('/api/patients', requireAuth, patientsRouter());
-  app.use('/api/triage', requireAuth, triageRouter({ ai }));
+  app.use('/api/triage', requireAuth, triageRouter({ ai, vitals }));
+  app.use('/api/vitals', requireAuth, vitalsRouter({ store: vitals }));
+  app.use('/api/alerts', requireAuth, alertsRouter());
   app.use('/api/dashboard', requireAuth, dashboardRouter());
 
   app.use(notFoundHandler);

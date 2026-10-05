@@ -9,22 +9,26 @@ All endpoints except `/health`, `GET /api/villages`, register, login and refresh
 
 ## Endpoints and roles
 
-| Method         | Path                                              |              patient              | health_worker | doctor | admin |
-| -------------- | ------------------------------------------------- | :-------------------------------: | :-----------: | :----: | :---: |
-| POST           | `/api/auth/register`                              | public: creates a patient account |               |        |       |
-| POST           | `/api/auth/login`, `/api/auth/refresh`            |              public               |               |        |       |
-| POST           | `/api/auth/logout` · GET `/api/auth/me`           |                 ✓                 |       ✓       |   ✓    |   ✓   |
-| GET            | `/api/villages`                                   |              public               |               |        |       |
-| POST           | `/api/villages`                                   |                                   |               |        |   ✓   |
-| GET/POST/PATCH | `/api/users`                                      |                                   |               |        |   ✓   |
-| GET            | `/api/patients`                                   |                                   | own villages  |   ✓    |   ✓   |
-| POST           | `/api/patients`                                   |                                   | own villages  |        |   ✓   |
-| GET            | `/api/patients/:id`                               |               self                | own villages  |   ✓    |   ✓   |
-| POST           | `/api/triage`                                     |               self                | own villages  |   ✓    |   ✓   |
-| POST           | `/api/triage/sync`                                |               self                | own villages  |   ✓    |   ✓   |
-| GET            | `/api/triage`, `/api/triage/:id`                  |               self                | own villages  |   ✓    |   ✓   |
-| POST           | `/api/triage/:id/notes`, `/api/triage/:id/review` |                                   |               |   ✓    |       |
-| GET            | `/api/dashboard/stats`                            |                                   | own villages  |   ✓    |   ✓   |
+| Method         | Path                                                      |              patient              | health_worker | doctor | admin |
+| -------------- | --------------------------------------------------------- | :-------------------------------: | :-----------: | :----: | :---: |
+| POST           | `/api/auth/register`                                      | public: creates a patient account |               |        |       |
+| POST           | `/api/auth/login`, `/api/auth/refresh`                    |              public               |               |        |       |
+| POST           | `/api/auth/logout` · GET `/api/auth/me`                   |                 ✓                 |       ✓       |   ✓    |   ✓   |
+| GET            | `/api/villages`                                           |              public               |               |        |       |
+| POST           | `/api/villages`                                           |                                   |               |        |   ✓   |
+| GET/POST/PATCH | `/api/users`                                              |                                   |               |        |   ✓   |
+| GET            | `/api/patients`                                           |                                   | own villages  |   ✓    |   ✓   |
+| POST           | `/api/patients`                                           |                                   | own villages  |        |   ✓   |
+| GET            | `/api/patients/:id`                                       |               self                | own villages  |   ✓    |   ✓   |
+| POST           | `/api/triage`                                             |               self                | own villages  |   ✓    |   ✓   |
+| POST           | `/api/triage/sync`                                        |               self                | own villages  |   ✓    |   ✓   |
+| GET            | `/api/triage`, `/api/triage/:id`                          |               self                | own villages  |   ✓    |   ✓   |
+| POST           | `/api/triage/:id/notes`, `/api/triage/:id/review`         |                                   |               |   ✓    |       |
+| GET            | `/api/dashboard/stats`                                    |                                   | own villages  |   ✓    |   ✓   |
+| GET            | `/api/vitals/:patientId`, `/api/vitals/:patientId/latest` |               self                | own villages  |   ✓    |   ✓   |
+| GET            | `/api/alerts`                                             |               self                | own villages  |   ✓    |   ✓   |
+| PATCH          | `/api/alerts/:id` (acknowledge)                           |                                   | own villages  |   ✓    |       |
+| GET            | `/api/model/version`                                      |              public               |               |        |       |
 
 ## Triage response
 
@@ -103,6 +107,36 @@ The server proxies this from the AI service. The PWA compares `sha256` with its 
 - **When the server falls back to rules only:** an HTTP error, an invalid payload, a 5 s timeout, or `503` (no model loaded).
 - **Condition names and advice** come from `/shared`. The server rebuilds them for `guidance.possibleConditions`, and the offline PWA uses the same texts.
 
+## Vitals and alerts (Phase 4)
+
+**Device → broker (MQTT 5, QoS 1).** Topic `ruralcare/vitals/{patientId}/{deviceId}`, payload:
+
+```json
+{
+  "ts": "2026-10-05T09:30:00.000Z",
+  "heartRate": 76,
+  "spo2": 97,
+  "temperatureC": 36.8,
+  "systolicBp": 122,
+  "diastolicBp": 80
+}
+```
+
+- **Validation:** any subset of vitals is allowed. Implausible values (e.g. SpO₂ > 100), unknown fields and timestamps more than 5 min in the future are rejected. A redelivered message (same device and timestamp) is stored once.
+- **Authentication:** every client needs a username and password. The ACL lets each device only _write_ its own patient's topic; the broker answers PUBACK reason 135 otherwise. The server account may only _read_. The server additionally checks that the device is registered to that patient.
+
+**`GET /api/vitals/:patientId?from&to&bucket`** returns `time_bucket()` averages plus min SpO₂ / max heart rate / max temperature and a reading count per bucket:
+
+- `bucket` is `1m`, `5m`, `15m`, `1h` or `1d`; by default it is chosen from the range.
+- `1h` and `1d` read the `vitals_hourly` continuous aggregate.
+- The response may hold at most 2,000 points.
+
+**`GET /api/vitals/:patientId/latest?windowMinutes=30`** returns the newest value of each vital and the alerts those values raise.
+
+**`GET /api/alerts?acknowledged=false&severity=critical`** lists alerts in scope, with `patientName` and an en/ta/hi `label`. There is one open alert per patient and threshold code; repeat breaches update `value`, `lastSeenAt` and `count`.
+
+**`PATCH /api/alerts/:id`** with `{ "acknowledged": true, "note": "Visited, sent to PHC" }` acknowledges an alert. Only health workers of that village and doctors can do this, and only once (`409 ALREADY_ACKNOWLEDGED`). A later breach opens a new alert.
+
 ## Errors
 
 ```json
@@ -115,4 +149,4 @@ The server proxies this from the AI service. The PWA compares `sha256` with its 
 }
 ```
 
-Common codes: `VALIDATION_ERROR`, `INVALID_JSON`, `INVALID_ID`, `UNAUTHORIZED`, `INVALID_CREDENTIALS`, `FORBIDDEN`, `NOT_FOUND`, `PHONE_TAKEN`, `UNKNOWN_VILLAGE`, `UNKNOWN_SYMPTOMS`, `PATIENT_REQUIRED`, `CLIENT_ID_CONFLICT`, `ALREADY_REVIEWED`, `INVALID_RANGE`, `RANGE_TOO_LARGE`.
+Common codes: `VALIDATION_ERROR`, `INVALID_JSON`, `INVALID_ID`, `UNAUTHORIZED`, `INVALID_CREDENTIALS`, `FORBIDDEN`, `NOT_FOUND`, `PHONE_TAKEN`, `UNKNOWN_VILLAGE`, `UNKNOWN_SYMPTOMS`, `PATIENT_REQUIRED`, `CLIENT_ID_CONFLICT`, `ALREADY_REVIEWED`, `INVALID_RANGE`, `RANGE_TOO_LARGE`, `TOO_MANY_POINTS`, `VITALS_UNAVAILABLE`, `ALREADY_ACKNOWLEDGED`, `MODEL_UNAVAILABLE`.

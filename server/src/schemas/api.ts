@@ -246,6 +246,8 @@ export const TriageSessionSchema = z
     origin: z.enum(SESSION_ORIGINS),
     occurredAt: z.iso.datetime(),
     input: TriageContextSchema,
+    vitalsSource: z.enum(['manual', 'device']).nullable().optional(),
+    vitalsMeasuredAt: z.iso.datetime().optional(),
     result: z.object({
       level: LevelSchema,
       source: SourceSchema,
@@ -378,3 +380,111 @@ export const ModelVersionResponseSchema = z
     classCount: z.number().int(),
   })
   .meta({ id: 'ModelVersion' });
+
+// ───────────────────────────── Vitals & alerts ─────────────────────────────
+
+export const VitalsQuerySchema = z.object({
+  from: z.iso.datetime({ offset: true }).optional().meta({ description: 'Default: 24 hours before `to`' }),
+  to: z.iso.datetime({ offset: true }).optional().meta({ description: 'Default: now' }),
+  bucket: z.enum(['1m', '5m', '15m', '1h', '1d']).optional().meta({
+    description:
+      'time_bucket width. Default depends on the range. 1h/1d read the hourly continuous aggregate.',
+  }),
+});
+
+export const LatestVitalsQuerySchema = z.object({
+  windowMinutes: z.coerce.number().int().min(1).max(1440).optional(),
+});
+
+const nullableNumber = z.number().nullable();
+
+export const VitalsSeriesSchema = z
+  .object({
+    patientId: ObjectIdSchema,
+    from: z.iso.datetime(),
+    to: z.iso.datetime(),
+    bucket: z.enum(['1m', '5m', '15m', '1h', '1d']),
+    bucketInterval: z.string(),
+    source: z.enum(['vitals', 'vitals_hourly']),
+    points: z.array(
+      z.object({
+        time: z.iso.datetime(),
+        heartRate: nullableNumber,
+        spo2: nullableNumber,
+        temperatureC: nullableNumber,
+        systolicBp: nullableNumber,
+        diastolicBp: nullableNumber,
+        minSpo2: nullableNumber,
+        maxHeartRate: nullableNumber,
+        maxTemperatureC: nullableNumber,
+        readings: z.number().int(),
+      }),
+    ),
+  })
+  .meta({ id: 'VitalsSeries' });
+
+const VitalAlertSchema = z.object({
+  code: z.string(),
+  severity: z.enum(['warning', 'critical']),
+  vital: z.string(),
+  value: z.number(),
+  threshold: z.number(),
+  label: LocalizedTextSchema,
+});
+
+export const LatestVitalsSchema = z
+  .object({
+    patientId: ObjectIdSchema,
+    windowMinutes: z.number().int(),
+    measuredAt: z.iso.datetime().nullable(),
+    vitals: z
+      .object({
+        heartRate: z.number().optional(),
+        spo2: z.number().optional(),
+        temperatureC: z.number().optional(),
+        systolicBp: z.number().optional(),
+        diastolicBp: z.number().optional(),
+      })
+      .nullable(),
+    alerts: z.array(VitalAlertSchema),
+  })
+  .meta({ id: 'LatestVitals' });
+
+export const AlertSchema = z
+  .object({
+    id: ObjectIdSchema,
+    patientId: ObjectIdSchema,
+    patientName: z.string().nullable(),
+    villageId: ObjectIdSchema,
+    deviceId: z.string(),
+    code: z.string(),
+    severity: z.enum(['warning', 'critical']),
+    vital: z.string(),
+    value: z.number(),
+    threshold: z.number(),
+    label: LocalizedTextSchema.nullable(),
+    firstSeenAt: z.iso.datetime(),
+    lastSeenAt: z.iso.datetime(),
+    count: z.number().int(),
+    acknowledged: z.boolean(),
+    acknowledgedBy: ObjectIdSchema.optional(),
+    acknowledgedAt: z.iso.datetime().optional(),
+    acknowledgeNote: z.string().optional(),
+  })
+  .meta({ id: 'Alert' });
+
+export const AlertListSchema = paginated(AlertSchema).meta({ id: 'AlertList' });
+
+export const ListAlertsQuerySchema = PaginationQuerySchema.extend({
+  acknowledged: z.enum(['true', 'false']).optional(),
+  severity: z.enum(['warning', 'critical']).optional(),
+  patientId: ObjectIdSchema.optional(),
+  villageId: ObjectIdSchema.optional(),
+});
+
+export const AcknowledgeAlertBodySchema = z
+  .object({
+    acknowledged: z.literal(true),
+    note: z.string().trim().min(1).max(1000).optional(),
+  })
+  .meta({ id: 'AcknowledgeAlertBody' });

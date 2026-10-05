@@ -248,6 +248,56 @@ export function buildOpenApiDocument() {
     },
   });
 
+  // ── Vitals & alerts ──
+  path({
+    method: 'get',
+    path: '/api/vitals/{id}',
+    tags: ['Vitals'],
+    summary: "A patient's vitals as time_bucket() averages (TimescaleDB)",
+    description:
+      'Minute buckets read raw readings; `1h`/`1d` read the `vitals_hourly` continuous aggregate. ' +
+      'Same access rules as GET /api/patients/{id}. 503 if vitals storage is not configured.',
+    security: secured,
+    request: { params: S.IdParamsSchema, query: S.VitalsQuerySchema },
+    responses: {
+      200: json(S.VitalsSeriesSchema, 'Series'),
+      ...errors,
+      503: json(S.ErrorSchema, 'Vitals disabled'),
+    },
+  });
+  path({
+    method: 'get',
+    path: '/api/vitals/{id}/latest',
+    tags: ['Vitals'],
+    summary: 'Newest value of each vital in a window (default 30 min) and the alerts they raise',
+    security: secured,
+    request: { params: S.IdParamsSchema, query: S.LatestVitalsQuerySchema },
+    responses: { 200: json(S.LatestVitalsSchema, 'Latest vitals'), ...errors },
+  });
+  path({
+    method: 'get',
+    path: '/api/alerts',
+    tags: ['Vitals'],
+    summary: 'Vital-sign alerts in scope (health worker: own villages; patient: own)',
+    security: secured,
+    request: { query: S.ListAlertsQuerySchema },
+    responses: { 200: json(S.AlertListSchema, 'Alerts'), ...errors },
+  });
+  path({
+    method: 'patch',
+    path: '/api/alerts/{id}',
+    tags: ['Vitals'],
+    summary: 'Acknowledge an alert (health worker of that village, or doctor)',
+    security: secured,
+    request: { params: S.IdParamsSchema, ...body(S.AcknowledgeAlertBodySchema) },
+    responses: {
+      200: json(S.AlertSchema, 'Acknowledged'),
+      ...errors,
+      404: json(S.ErrorSchema, 'Not found'),
+      409: json(S.ErrorSchema, 'Already acknowledged'),
+    },
+  });
+
   // ── Dashboard ──
   path({
     method: 'get',

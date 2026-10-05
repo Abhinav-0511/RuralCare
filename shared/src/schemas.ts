@@ -89,6 +89,11 @@ export type SymptomVocabulary = z.infer<typeof SymptomVocabularySchema>;
 
 // ───────────────────────────── Red-flag rules ─────────────────────────────
 
+/** Vital signs a rule can test (temperature is the separate top-level `temperatureC`). */
+export const VITAL_KEYS = ['heartRate', 'spo2', 'systolicBp', 'diastolicBp'] as const;
+export type VitalKey = (typeof VITAL_KEYS)[number];
+type VitalComparison = Partial<Record<VitalKey, number>>;
+
 /** A condition object has exactly one key. See shared/README.md for the grammar. */
 export type Condition =
   | { anySymptoms: string[] }
@@ -98,10 +103,21 @@ export type Condition =
   | { ageKnown: boolean }
   | { pregnant: boolean }
   | { temperatureCGte: number }
+  | { vitalLt: VitalComparison }
+  | { vitalGte: VitalComparison }
   | { all: Condition[] }
   | { any: Condition[] };
 
 const symptomList = z.array(z.string()).min(1);
+/** Exactly one vital, e.g. { "spo2": 90 }. */
+const vitalComparison = z
+  .strictObject({
+    heartRate: z.number().optional(),
+    spo2: z.number().optional(),
+    systolicBp: z.number().optional(),
+    diastolicBp: z.number().optional(),
+  })
+  .refine((v) => Object.keys(v).length === 1, 'Compare exactly one vital');
 
 export const ConditionSchema: z.ZodType<Condition> = z.lazy(() =>
   z.union([
@@ -112,6 +128,8 @@ export const ConditionSchema: z.ZodType<Condition> = z.lazy(() =>
     z.strictObject({ ageKnown: z.boolean() }),
     z.strictObject({ pregnant: z.boolean() }),
     z.strictObject({ temperatureCGte: z.number() }),
+    z.strictObject({ vitalLt: vitalComparison }),
+    z.strictObject({ vitalGte: vitalComparison }),
     z.strictObject({ all: z.array(ConditionSchema).min(1) }),
     z.strictObject({ any: z.array(ConditionSchema).min(1) }),
   ]),
@@ -146,6 +164,15 @@ export type RedFlagRuleSet = z.infer<typeof RedFlagRuleSetSchema>;
 
 // ───────────────────────────── Triage input ─────────────────────────────
 
+/** Plausible ranges: values outside them are measurement errors and are rejected. */
+export const VitalsSchema = z.strictObject({
+  heartRate: z.number().int().min(20).max(250).optional(),
+  spo2: z.number().int().min(50).max(100).optional(),
+  systolicBp: z.number().int().min(50).max(260).optional(),
+  diastolicBp: z.number().int().min(30).max(160).optional(),
+});
+export type Vitals = z.infer<typeof VitalsSchema>;
+
 export const SEXES = ['female', 'male', 'other'] as const;
 export type Sex = (typeof SEXES)[number];
 
@@ -159,6 +186,8 @@ export const TriageContextSchema = z.object({
   sex: z.enum(SEXES).optional(),
   pregnant: z.boolean().optional(),
   temperatureC: z.number().min(30).max(45).optional(),
+  /** Measured vitals (device or manual entry). Critical values trigger red-flag rules. */
+  vitals: VitalsSchema.optional(),
 });
 export type TriageContext = z.infer<typeof TriageContextSchema>;
 

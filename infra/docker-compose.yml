@@ -52,12 +52,24 @@ services:
     ports:
       - '${MQTT_PORT:-1883}:1883'
       - '${MQTT_WS_PORT:-9001}:9001'
+    # Authenticated + ACL. Device accounts come from `npm run devices:provision -w @ruralcare/server`
+    # (then `docker compose ... restart mosquitto`); the server account is (re)created on every start.
+    entrypoint: ['/bin/sh', '/mosquitto/entrypoint.sh']
+    environment:
+      MQTT_SERVER_USERNAME: ${MQTT_SERVER_USERNAME}
+      MQTT_SERVER_PASSWORD: ${MQTT_SERVER_PASSWORD}
     volumes:
       - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/entrypoint.sh:/mosquitto/entrypoint.sh:ro
+      - ./mosquitto/generated:/mosquitto/config/generated
       - mosquitto-data:/mosquitto/data
       - mosquitto-log:/mosquitto/log
     healthcheck:
-      test: ['CMD', 'mosquitto_sub', '-t', '$$SYS/broker/uptime', '-C', '1', '-W', '3']
+      test:
+        [
+          'CMD-SHELL',
+          'mosquitto_sub -u "$$MQTT_SERVER_USERNAME" -P "$$MQTT_SERVER_PASSWORD" -t "\$$SYS/broker/uptime" -C 1 -W 3',
+        ]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -96,6 +108,8 @@ services:
       MONGO_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017/${MONGO_DB}?authSource=admin
       TSDB_URL: postgres://${TSDB_USER}:${TSDB_PASSWORD}@timescaledb:5432/${TSDB_DB}
       MQTT_URL: mqtt://mosquitto:1883
+      MQTT_USERNAME: ${MQTT_SERVER_USERNAME}
+      MQTT_PASSWORD: ${MQTT_SERVER_PASSWORD}
       AI_SERVICE_URL: http://ai-service:8000
     ports:
       - '${SERVER_PORT:-4000}:4000'
@@ -135,16 +149,24 @@ services:
       server:
         condition: service_healthy
 
-  # ───────────────────────────── Edge (Phase 4) ─────────────────────────────
-  # edge-simulator:
-  #   build:
-  #     context: ../edge
-  #   env_file: ../edge/.env
-  #   environment:
-  #     MQTT_URL: mqtt://mosquitto:1883
-  #   depends_on:
-  #     mosquitto:
-  #       condition: service_healthy
+  # ───────────────────────────── Edge ─────────────────────────────
+  # Vitals simulator: needs edge/devices.json from `npm run devices:provision -w @ruralcare/server`.
+  #   docker compose -f infra/docker-compose.yml --profile edge up -d edge-simulator
+  #   docker compose -f infra/docker-compose.yml --profile edge exec edge-simulator   #     python -m simulator inject --device rc-dev-02 --kind spo2_critical
+  edge-simulator:
+    profiles: ['edge']
+    build:
+      context: ../edge
+    restart: unless-stopped
+    env_file: ../edge/.env
+    environment:
+      MQTT_URL: mqtt://mosquitto:1883
+      DEVICES_FILE: /app/devices.json
+    volumes:
+      - ../edge/devices.json:/app/devices.json:ro
+    depends_on:
+      mosquitto:
+        condition: service_healthy
 
   # ───────────────────────────── Streaming (Phase 6) ─────────────────────────────
   # kafka:

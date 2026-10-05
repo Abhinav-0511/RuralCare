@@ -19,7 +19,10 @@ jobs:
       - run: npm run lint
       - run: npm run format:check
       - run: npm run typecheck
+      # Server tests start TimescaleDB + Mosquitto with Testcontainers; on CI a missing Docker is a failure.
       - run: npm test
+        env:
+          REQUIRE_DOCKER_TESTS: '1'
 
   python:
     name: Python (ai-service)
@@ -45,10 +48,28 @@ jobs:
       - run: ruff format --check .
       - run: pytest -q
 
+  edge:
+    name: Python (edge simulator)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: edge
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: edge/requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: pytest -q
+
   docker:
     name: Docker images build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - run: for d in infra server ai-service client; do cp $d/.env.example $d/.env; done
-      - run: docker compose -f infra/docker-compose.yml build
+      - run: for d in infra server ai-service client edge; do cp $d/.env.example $d/.env; done
+      - run: docker compose -f infra/docker-compose.yml --profile edge build

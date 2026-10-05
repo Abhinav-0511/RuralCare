@@ -28,3 +28,8 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 .idea/
+
+# Phase 4: generated MQTT credentials (contain password hashes / passwords)
+infra/mosquitto/generated/*
+!infra/mosquitto/generated/.gitkeep
+edge/devices.json

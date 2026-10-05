@@ -26,6 +26,21 @@ const EnvSchema = z
     JWT_REFRESH_TTL: z.string().default('7d'),
     BCRYPT_ROUNDS: z.coerce.number().int().min(4).max(15).default(12),
 
+    // Vitals (Phase 4). Without TSDB_URL the vitals/alerts features are disabled (endpoints answer 503)
+    // and triage runs without device vitals; without MQTT_URL no readings are ingested.
+    TSDB_URL: z.string().optional(),
+    VITALS_RAW_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(30),
+    MQTT_URL: z.string().optional(),
+    MQTT_USERNAME: z.string().default('ruralcare-server'),
+    MQTT_PASSWORD: z.string().optional(),
+    MQTT_TOPIC_PREFIX: z
+      .string()
+      .regex(/^[a-z0-9_/-]+$/)
+      .default('ruralcare/vitals'),
+    // Where `npm run devices:provision` writes Mosquitto's passwd/acl and the simulator's device list.
+    MQTT_PROVISION_DIR: z.string().default('../infra/mosquitto/generated'),
+    SIMULATOR_DEVICES_FILE: z.string().default('../edge/devices.json'),
+
     // Optional: create this admin on startup if no admin exists yet
     SEED_ADMIN_PHONE: z.string().optional(),
     SEED_ADMIN_PASSWORD: z.string().min(8).optional(),

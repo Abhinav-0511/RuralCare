@@ -23,7 +23,7 @@ The app supports English, Tamil (தமிழ்) and Hindi (हिन्दी)
 | AI service     | Python FastAPI + onnxruntime; scikit-learn → ONNX (skl2onnx) training. See [MODEL_REPORT.md](docs/MODEL_REPORT.md) | [`ai-service/`](ai-service/) |
 | Primary DB     | MongoDB (users, triage sessions, sync records)                                                                     | —                            |
 | Time-series DB | TimescaleDB (PostgreSQL) for patient vitals                                                                        | —                            |
-| Edge           | Eclipse Mosquitto (MQTT) + Python vitals simulator                                                                 | [`edge/`](edge/)             |
+| Edge           | Eclipse Mosquitto (MQTT, passwords + ACL) + Python vitals simulator                                                | [`edge/`](edge/)             |
 | Infra          | Docker Compose (now), Kafka + Kubernetes (later)                                                                   | [`infra/`](infra/)           |
 | Docs           | Architecture, API docs, report notes                                                                               | [`docs/`](docs/)             |
 
@@ -91,6 +91,21 @@ docker compose -f infra/docker-compose.yml exec server node server/dist/seed.js
 docker compose -f infra/docker-compose.yml up -d mongodb timescaledb mosquitto
 ```
 
+**Vitals demo (MQTT → TimescaleDB → alerts → triage).** After seeding:
+
+```bash
+npm install                                          # once, on the host
+npm run devices:provision -w @ruralcare/server       # MQTT passwords + ACL for the 5 seeded devices
+docker compose -f infra/docker-compose.yml restart mosquitto
+docker compose -f infra/docker-compose.yml --profile edge up -d edge-simulator   # readings every 5 s
+
+# Inject an abnormal reading on demand (kinds: python -m simulator kinds)
+docker compose -f infra/docker-compose.yml --profile edge exec edge-simulator \
+  python -m simulator inject --device rc-dev-03 --kind spo2_critical
+```
+
+The critical alert appears in `GET /api/alerts`. A triage for that patient in the next 30 minutes becomes EMERGENCY (`RF_LOW_OXYGEN`), even after normal readings resume.
+
 **Demo logins.** Every account uses the password `RuralCare@123`. The seed wipes existing data.
 
 | Role          | Phone                                                                                                                |
@@ -123,7 +138,8 @@ npm install
 npm run dev:server         # http://localhost:4000 (needs MongoDB, e.g. the docker one)
 npm run seed -w @ruralcare/server   # load demo data
 npm run dev:client         # http://localhost:5173
-npm test                   # vitest in every workspace (server tests use an in-memory MongoDB)
+npm test                   # vitest in every workspace (server tests: in-memory MongoDB, plus
+                           # TimescaleDB + Mosquitto containers via Testcontainers; skipped without Docker)
 npm run lint && npm run typecheck && npm run format:check
 
 # Python AI service

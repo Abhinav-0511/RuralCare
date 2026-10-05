@@ -19,6 +19,8 @@ import {
 } from '../schemas/api';
 import { canAccessPatient, sessionScope } from '../services/access';
 import type { AiClient } from '../services/aiClient';
+import { attachRecentVitals } from '../vitals/recent';
+import type { VitalsStore } from '../vitals/store';
 import {
   decisionToResult,
   evaluateTriage,
@@ -42,7 +44,9 @@ function canAccessSession(user: AuthUser, session: { patientId: unknown; village
   return canAccessPatient(user, { _id: session.patientId, villageId: session.villageId });
 }
 
-export function triageRouter(deps: { ai: AiClient }) {
+type TriageDeps = { ai: AiClient; vitals?: VitalsStore | null };
+
+export function triageRouter(deps: TriageDeps) {
   const r = Router();
 
   /** Online triage. Rules first; model only if no red flag; rules-only fallback if the model is down. */
@@ -64,15 +68,20 @@ export function triageRouter(deps: { ai: AiClient }) {
       return;
     }
 
-    const decision = await evaluateTriage(input, deps.ai);
+    // Recent device vitals (if any) go into the rules: critical values make it an EMERGENCY.
+    const at = new Date();
+    const withVitals = await attachRecentVitals(input, patientId, at, deps.vitals);
+    const decision = await evaluateTriage(withVitals.input, deps.ai);
     const { session, duplicate } = await insertSessionIdempotent({
       clientId,
       patientId: patient._id,
       villageId: patient.villageId,
       performedBy: new Types.ObjectId(user.id),
       origin: 'online',
-      occurredAt: new Date(),
-      input,
+      occurredAt: at,
+      input: withVitals.input,
+      vitalsSource: withVitals.vitalsSource,
+      ...(withVitals.vitalsMeasuredAt ? { vitalsMeasuredAt: withVitals.vitalsMeasuredAt } : {}),
       result: decisionToResult(decision),
     });
     res.status(duplicate ? 200 : 201).json({ ...toSessionResponse(session), duplicate });
@@ -91,7 +100,7 @@ export function triageRouter(deps: { ai: AiClient }) {
     // service isn't flooded after a long offline period.
     for (const item of sessions) {
       try {
-        results.push(await syncOne(user, item, deps.ai));
+        results.push(await syncOne(user, item, deps));
       } catch (err) {
         if (!(err instanceof HttpError)) throw err;
         results.push({
@@ -178,7 +187,7 @@ export function triageRouter(deps: { ai: AiClient }) {
 async function syncOne(
   user: AuthUser,
   item: z.output<typeof SyncItemSchema>,
-  ai: AiClient,
+  deps: TriageDeps,
 ): Promise<z.input<typeof SyncResultItemSchema>> {
   const patient = await loadAccessiblePatient(user, item.patientId);
 
@@ -195,10 +204,14 @@ async function syncOne(
 
   // Unknown symptoms are kept (the device may have a newer vocabulary); the engine ignores them.
   const input = normalizeInput({ ...item.input, sex: item.input.sex ?? patient.sex });
-  const decision = await evaluateTriage(input, ai);
-  const verdictChanged = item.clientResult !== undefined && item.clientResult.level !== decision.level;
   const clientTime = new Date(item.clientCreatedAt);
   const now = new Date();
+  // A device clock in the future must not distort statistics.
+  const occurredAt = clientTime.getTime() > now.getTime() + MAX_CLOCK_SKEW_MS ? now : clientTime;
+  // Device vitals from the 30 minutes before the session was recorded offline.
+  const withVitals = await attachRecentVitals(input, item.patientId, occurredAt, deps.vitals);
+  const decision = await evaluateTriage(withVitals.input, deps.ai);
+  const verdictChanged = item.clientResult !== undefined && item.clientResult.level !== decision.level;
 
   const { session, duplicate } = await insertSessionIdempotent({
     clientId: item.clientId,
@@ -206,9 +219,10 @@ async function syncOne(
     villageId: patient.villageId,
     performedBy: new Types.ObjectId(user.id),
     origin: 'offline_sync',
-    // A device clock in the future must not distort statistics.
-    occurredAt: clientTime.getTime() > now.getTime() + MAX_CLOCK_SKEW_MS ? now : clientTime,
-    input,
+    occurredAt,
+    input: withVitals.input,
+    vitalsSource: withVitals.vitalsSource,
+    ...(withVitals.vitalsMeasuredAt ? { vitalsMeasuredAt: withVitals.vitalsMeasuredAt } : {}),
     result: decisionToResult(decision),
     ...(item.clientResult ? { clientResult: item.clientResult } : {}),
     verdictChanged,

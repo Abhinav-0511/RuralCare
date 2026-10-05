@@ -1,10 +1,10 @@
 {
-  "modelVersion": "lr-20261004-ab911d5e",
+  "modelVersion": "lr-20261005-ab911d5e",
   "algorithm": "Logistic Regression (C=10000)",
   "hyperparameters": {
     "C": 10000.0
   },
-  "createdAt": "2026-10-04T18:27:18Z",
+  "createdAt": "2026-10-05T05:16:37Z",
   "sha256": "ab911d5e411295c9d3ff772c40975e05416113cd60a93686ae2aced46da2ed79",
   "sizeBytes": 27591,
   "onnx": {
@@ -16,9 +16,9 @@
   "metrics": {
     "cvFolds": 5,
     "cleanTop1": 1.0,
-    "noisyTop1": 0.946,
-    "noisyTop3": 0.998,
-    "noisyUnderTriage": 0.0059
+    "noisyTop1": 0.9447,
+    "noisyTop3": 0.9984,
+    "noisyUnderTriage": 0.0063
   },
   "dataset": {
     "ref": "itachi9604/disease-symptom-description-dataset",

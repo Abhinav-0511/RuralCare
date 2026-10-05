@@ -107,26 +107,41 @@ sequenceDiagram
     UI->>DB: mark synced, store server verdict
 ```
 
-### 2c. Vitals path (edge → time-series)
+### 2c. Vitals path (edge → time-series → alerts → triage)
 
 ```mermaid
 sequenceDiagram
-    participant SIM as Vitals simulator
-    participant MQ as Mosquitto
+    participant SIM as Vitals device (simulator)
+    participant MQ as Mosquitto (auth + ACL)
     participant API as Express API (MQTT subscriber)
     participant TS as TimescaleDB
-    participant DR as Doctor dashboard
+    participant MG as MongoDB
+    participant HW as Health worker / doctor
 
-    SIM->>MQ: publish vitals/{deviceId} {hr, spo2, temp, bp, ts}
+    SIM->>MQ: publish ruralcare/vitals/{patientId}/{deviceId} {ts, heartRate, spo2, temperatureC, systolicBp, diastolicBp} (QoS 1)
+    Note over MQ: ACL: a device may only WRITE its own patient's topic;<br/>the server account may only READ
     MQ->>API: deliver message
-    API->>API: validate (Zod), map device → patient
-    API->>TS: INSERT into vitals hypertable
-    API->>API: threshold check (e.g. SpO₂ < 90%) → alert
-    DR->>API: GET /api/vitals/:patientId?range=24h
-    API->>TS: time_bucket() aggregate query
-    TS-->>API: series
-    API-->>DR: chart data
+    API->>API: validate (Zod), check device ↔ patient in MongoDB
+    API->>TS: INSERT INTO vitals hypertable (duplicates ignored)
+    API->>MG: thresholds (shared/data/vitals.json) → open / update alert
+    HW->>API: GET /api/alerts · PATCH /api/alerts/:id (acknowledge)
+    HW->>API: GET /api/vitals/:patientId?bucket=1h
+    API->>TS: time_bucket() on raw data, or the vitals_hourly continuous aggregate
+    HW->>API: POST /api/triage
+    API->>TS: most abnormal value per vital in the last 30 min
+    API->>API: shared red-flag rules (e.g. SpO₂ < 90 → EMERGENCY)
 ```
+
+### 2d. Why vitals use TimescaleDB while everything else uses MongoDB
+
+|            | MongoDB (users, patients, triage sessions, alerts)                                                        | TimescaleDB (device vitals)                                                                                                                                                                                                                                             |
+| ---------- | --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Data shape | Documents with nested, evolving fields (a triage session holds input, result, model output, review notes) | One narrow row per reading: time + 5 numbers                                                                                                                                                                                                                            |
+| Volume     | Tens of writes per patient per month                                                                      | One reading every 5 s per device: ~17,000 rows per device per day                                                                                                                                                                                                       |
+| Queries    | Fetch or update one document; small aggregations for dashboards                                           | "Average SpO₂ per hour for the last week", "worst value in the last 30 min"                                                                                                                                                                                             |
+| What helps | Flexible schema, simple idempotent upserts (`clientId`), unique partial indexes (one open alert)          | **Hypertable** (automatic 1-day chunks, so recent queries touch little data), **`time_bucket()`**, a **continuous aggregate** (`vitals_hourly`, refreshed every 30 min, plus real-time rows), and **retention policies** (raw readings 30 days, hourly averages 1 year) |
+
+A document per reading would be slow and large in MongoDB, and these time-series features would have to be built by hand. Conversely, triage sessions don't fit a fixed relational row. Each store does what it is good at. Alerts live in MongoDB because they are low-volume, stateful documents (acknowledged by whom, when, with what note) that sit next to patients and sessions.
 
 ## 3. Key design decisions
 
@@ -156,11 +171,11 @@ sequenceDiagram
 
 Model evaluation and limitations: [MODEL_REPORT.md](MODEL_REPORT.md). Safety decisions and the Phase 5 form requirements (age required, pregnancy question) are in [SAFETY.md](SAFETY.md).
 
-| Phase | Scope                                                                                                                                                                                                                                                                                 | Status  |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| 1     | `/shared` rules, vocabulary and triage levels; TS and Python red-flag engines with shared golden tests; npm workspaces, lint/format, health endpoints, Docker builds, CI                                                                                                              | ✅ Done |
-| 2     | Backend API: Mongoose models, JWT + RBAC, Zod validation, triage with rules-only fallback, idempotent sync, doctor review, dashboard stats, Swagger UI, seed data, safety floors                                                                                                      | ✅ Done |
-| 3     | Kaggle dataset (verified, not committed), dedup + 5-fold CV, clean + noisy evaluation, 3 models compared, tuned logistic regression → 27 KB ONNX, parity sklearn ↔ onnxruntime ↔ onnxruntime-node, conditions + advice in /shared, `/predict`, `/model/version`, real-model seed data | ✅ Done |
-| 4     | MQTT vitals simulator, server subscriber → TimescaleDB hypertable, threshold alerts, Mosquitto auth                                                                                                                                                                                   | ⏳      |
-| 5     | Offline-first PWA: Workbox, symptom checklist, in-browser rules + ONNX, Dexie outbox sync, en/ta/hi, dashboards                                                                                                                                                                       | ⏳      |
-| 6     | Kafka, Kubernetes manifests, security hardening, Playwright E2E (incl. offline), Lighthouse, final report                                                                                                                                                                             | ⏳      |
+| Phase | Scope                                                                                                                                                                                                                                                                                                    | Status  |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| 1     | `/shared` rules, vocabulary and triage levels; TS and Python red-flag engines with shared golden tests; npm workspaces, lint/format, health endpoints, Docker builds, CI                                                                                                                                 | ✅ Done |
+| 2     | Backend API: Mongoose models, JWT + RBAC, Zod validation, triage with rules-only fallback, idempotent sync, doctor review, dashboard stats, Swagger UI, seed data, safety floors                                                                                                                         | ✅ Done |
+| 3     | Kaggle dataset (verified, not committed), dedup + 5-fold CV, clean + noisy evaluation, 3 models compared, tuned logistic regression → 27 KB ONNX, parity sklearn ↔ onnxruntime ↔ onnxruntime-node, conditions + advice in /shared, `/predict`, `/model/version`, real-model seed data                    | ✅ Done |
+| 4     | Mosquitto with passwords + per-device ACL, Python vitals simulator with on-demand abnormal readings, MQTT → TimescaleDB hypertable + hourly continuous aggregate + retention, threshold alerts with acknowledgement, vitals in triage (critical vitals → EMERGENCY via shared rules), vitals/alerts APIs | ✅ Done |
+| 5     | Offline-first PWA: Workbox, symptom checklist, in-browser rules + ONNX, Dexie outbox sync, en/ta/hi, dashboards                                                                                                                                                                                          | ⏳      |
+| 6     | Kafka, Kubernetes manifests, security hardening, Playwright E2E (incl. offline), Lighthouse, final report                                                                                                                                                                                                | ⏳      |

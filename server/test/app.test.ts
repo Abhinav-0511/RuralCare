@@ -13,7 +13,7 @@ describe('GET /health', () => {
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({
       status: 'ok',
-      dependencies: { mongodb: 'up', aiService: 'up' },
+      dependencies: { mongodb: 'up', aiService: 'up', timescaledb: 'disabled', mqtt: 'disabled' },
       shared: { redFlagRulesVersion: redFlagEngine.rulesVersion, safetyFloorCount: 1 },
     });
   });
@@ -59,6 +59,8 @@ describe('API docs', () => {
     expect(res.status).toBe(200);
     expect(res.body.openapi).toBe('3.1.0');
     expect(Object.keys(res.body.paths).sort()).toEqual([
+      '/api/alerts',
+      '/api/alerts/{id}',
       '/api/auth/login',
       '/api/auth/logout',
       '/api/auth/me',
@@ -76,6 +78,8 @@ describe('API docs', () => {
       '/api/users',
       '/api/users/{id}',
       '/api/villages',
+      '/api/vitals/{id}',
+      '/api/vitals/{id}/latest',
     ]);
     expect(res.body.components.schemas).toHaveProperty('TriageRequest');
     expect(res.body.components.securitySchemes).toHaveProperty('bearerAuth');

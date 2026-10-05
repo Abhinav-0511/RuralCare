@@ -48,8 +48,19 @@ def _rules(*rules: dict) -> dict:
         ({"anySymptoms": ["chest_pain"], "pregnant": True}, None),
         ({"anySymptoms": []}, None),
         ({"pregnant": "yes"}, None),
+        ({"vitalLt": {"spo2": 90, "heartRate": 40}}, "exactly one vital"),
+        ({"vitalLt": {"pulse": 40}}, None),
     ],
-    ids=["unknown symptom", "nested unknown symptom", "unknown key", "two keys", "empty list", "wrong type"],
+    ids=[
+        "unknown symptom",
+        "nested unknown symptom",
+        "unknown key",
+        "two keys",
+        "empty list",
+        "wrong type",
+        "two vitals",
+        "unknown vital",
+    ],
 )
 def test_invalid_rules_fail_closed(when: dict, match: str | None) -> None:
     with pytest.raises(ValueError, match=match):

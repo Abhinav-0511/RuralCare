@@ -10,6 +10,7 @@ import { Patient } from '../src/models/patient';
 import { type Role, User } from '../src/models/user';
 import { Village } from '../src/models/village';
 import type { AiClient } from '../src/services/aiClient';
+import { VitalsStore } from '../src/vitals/store';
 
 export const testEnv = {
   NODE_ENV: 'test',
@@ -142,3 +143,30 @@ export const adultInput = (symptoms: string[], extra: Partial<TriageContext> = {
   ageMonths: 35 * 12,
   ...extra,
 });
+
+// ───────────── Vitals (TimescaleDB) ─────────────
+
+/** True when globalSetup could start the TimescaleDB/Mosquitto containers. */
+export const hasDocker = () => inject('tsdbUrl') !== '';
+
+/** A VitalsStore on the shared test TimescaleDB, closed after the file. */
+export function useVitalsStore() {
+  let store: VitalsStore | null = null;
+  beforeAll(() => {
+    if (hasDocker()) store = VitalsStore.connect(inject('tsdbUrl'));
+  });
+  afterAll(async () => {
+    await store?.close();
+  });
+  return () => {
+    if (!store) throw new Error('TimescaleDB not available');
+    return store;
+  };
+}
+
+export const randomObjectId = () => new mongoose.Types.ObjectId().toString();
+
+export const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000);
+
+export const makeAppWithVitals = (store: VitalsStore | null, ai: AiClient = fakeAi()) =>
+  createApp({ env: testEnv, ai, vitals: store });

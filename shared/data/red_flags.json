@@ -1,75 +1,144 @@
 {
-  "version": "1.2.0",
-  "notes": "Deterministic red-flag rules. Evaluated BEFORE the ML model on every path (client offline, server, ai-service). Any match => EMERGENCY and the model is never called. Each condition object has exactly one key. Leaf conditions: anySymptoms, allSymptoms, ageMonthsLt, ageMonthsGte, ageKnown, pregnant, temperatureCGte. Combinators: all, any. A condition on a missing context value (e.g. age not given) evaluates to false. 'floors' never produce EMERGENCY; they set the minimum level the final result may have (the model can't go below it). Thresholds are based on common public guidance and are NOT clinically validated. See docs/SAFETY.md.",
+  "version": "1.3.0",
+  "notes": "Deterministic red-flag rules. Evaluated BEFORE the ML model on every path (client offline, server, ai-service). Any match => EMERGENCY and the model is never called. Each condition object has exactly one key. Leaf conditions: anySymptoms, allSymptoms, ageMonthsLt, ageMonthsGte, ageKnown, pregnant, temperatureCGte, vitalLt/vitalGte (exactly one of heartRate, spo2, systolicBp, diastolicBp, e.g. {\"vitalLt\": {\"spo2\": 90}}). Combinators: all, any. A condition on a missing context value (e.g. age not given) evaluates to false. 'floors' never produce EMERGENCY; they set the minimum level the final result may have (the model can't go below it). Thresholds are based on common public guidance and are NOT clinically validated. See docs/SAFETY.md.",
   "rules": [
     {
       "id": "RF_CHEST_PAIN",
-      "label": { "en": "Chest pain", "ta": "மார்பு வலி", "hi": "सीने में दर्द" },
-      "when": { "anySymptoms": ["chest_pain"] }
+      "label": {"en": "Chest pain", "ta": "மார்பு வலி", "hi": "सीने में दर्द"},
+      "when": {"anySymptoms": ["chest_pain"]}
     },
     {
       "id": "RF_BREATHING",
-      "label": { "en": "Difficulty breathing", "ta": "மூச்சுத் திணறல்", "hi": "सांस लेने में तकलीफ" },
-      "when": { "anySymptoms": ["breathlessness"] }
+      "label": {"en": "Difficulty breathing", "ta": "மூச்சுத் திணறல்", "hi": "सांस लेने में तकलीफ"},
+      "when": {"anySymptoms": ["breathlessness"]}
     },
     {
       "id": "RF_UNCONSCIOUS",
-      "label": { "en": "Unconscious or not responding", "ta": "சுயநினைவு இல்லை அல்லது பதிலளிக்கவில்லை", "hi": "बेहोशी या कोई प्रतिक्रिया नहीं" },
-      "when": { "anySymptoms": ["unconscious", "coma"] }
+      "label": {
+        "en": "Unconscious or not responding",
+        "ta": "சுயநினைவு இல்லை அல்லது பதிலளிக்கவில்லை",
+        "hi": "बेहोशी या कोई प्रतिक्रिया नहीं"
+      },
+      "when": {"anySymptoms": ["unconscious", "coma"]}
     },
     {
       "id": "RF_SEVERE_BLEEDING",
-      "label": { "en": "Severe bleeding", "ta": "கடுமையான இரத்தப்போக்கு", "hi": "बहुत ज़्यादा खून बहना" },
-      "when": { "anySymptoms": ["severe_bleeding", "vomiting_blood", "stomach_bleeding"] }
+      "label": {"en": "Severe bleeding", "ta": "கடுமையான இரத்தப்போக்கு", "hi": "बहुत ज़्यादा खून बहना"},
+      "when": {"anySymptoms": ["severe_bleeding", "vomiting_blood", "stomach_bleeding"]}
     },
     {
       "id": "RF_STROKE_SIGNS",
-      "label": { "en": "Possible stroke signs (face, arm, speech)", "ta": "பக்கவாத அறிகுறிகள் (முகம், கை, பேச்சு)", "hi": "लकवे (स्ट्रोक) के संकेत (चेहरा, बांह, बोली)" },
-      "when": { "anySymptoms": ["face_drooping", "weakness_of_one_body_side", "slurred_speech"] }
+      "label": {
+        "en": "Possible stroke signs (face, arm, speech)",
+        "ta": "பக்கவாத அறிகுறிகள் (முகம், கை, பேச்சு)",
+        "hi": "लकवे (स्ट्रोक) के संकेत (चेहरा, बांह, बोली)"
+      },
+      "when": {"anySymptoms": ["face_drooping", "weakness_of_one_body_side", "slurred_speech"]}
     },
     {
       "id": "RF_SEIZURE",
-      "label": { "en": "Seizure / fits", "ta": "வலிப்பு", "hi": "दौरा / झटके" },
-      "when": { "anySymptoms": ["seizure"] }
+      "label": {"en": "Seizure / fits", "ta": "வலிப்பு", "hi": "दौरा / झटके"},
+      "when": {"anySymptoms": ["seizure"]}
     },
     {
       "id": "RF_FEVER_YOUNG_INFANT",
-      "label": { "en": "Fever in a baby under 3 months", "ta": "3 மாதத்திற்குட்பட்ட குழந்தைக்கு காய்ச்சல்", "hi": "3 महीने से छोटे शिशु को बुखार" },
-      "when": {
-        "all": [
-          { "ageMonthsLt": 3 },
-          { "any": [{ "anySymptoms": ["mild_fever", "high_fever"] }, { "temperatureCGte": 38 }] }
-        ]
-      }
+      "label": {
+        "en": "Fever in a baby under 3 months",
+        "ta": "3 மாதத்திற்குட்பட்ட குழந்தைக்கு காய்ச்சல்",
+        "hi": "3 महीने से छोटे शिशु को बुखार"
+      },
+      "when": {"all": [{"ageMonthsLt": 3}, {"any": [{"anySymptoms": ["mild_fever", "high_fever"]}, {"temperatureCGte": 38}]}]}
     },
     {
       "id": "RF_HIGH_FEVER_INFANT",
-      "label": { "en": "High fever in a baby under 1 year", "ta": "1 வயதுக்குட்பட்ட குழந்தைக்கு அதிக காய்ச்சல்", "hi": "1 साल से छोटे शिशु को तेज़ बुखार" },
+      "label": {
+        "en": "High fever in a baby under 1 year",
+        "ta": "1 வயதுக்குட்பட்ட குழந்தைக்கு அதிக காய்ச்சல்",
+        "hi": "1 साल से छोटे शिशु को तेज़ बुखार"
+      },
+      "when": {"all": [{"ageMonthsLt": 12}, {"any": [{"anySymptoms": ["high_fever"]}, {"temperatureCGte": 39}]}]}
+    },
+    {
+      "id": "RF_PREGNANCY_BLEEDING",
+      "label": {"en": "Bleeding during pregnancy", "ta": "கர்ப்ப காலத்தில் இரத்தப்போக்கு", "hi": "गर्भावस्था में खून आना"},
+      "when": {"all": [{"pregnant": true}, {"anySymptoms": ["vaginal_bleeding", "severe_bleeding"]}]}
+    },
+    {
+      "id": "RF_CONFUSION",
+      "label": {
+        "en": "Sudden confusion or unusual drowsiness",
+        "ta": "திடீர் குழப்பம் அல்லது அசாதாரண தூக்கக் கலக்கம்",
+        "hi": "अचानक भ्रम या असामान्य सुस्ती"
+      },
+      "when": {"anySymptoms": ["altered_sensorium"]}
+    },
+    {
+      "id": "RF_COUGHING_BLOOD",
+      "label": {"en": "Coughing up blood", "ta": "இருமலில் இரத்தம்", "hi": "खांसी में खून आना"},
+      "when": {"anySymptoms": ["blood_in_sputum"]}
+    },
+    {
+      "id": "RF_LOW_OXYGEN",
+      "label": {
+        "en": "Very low oxygen level (SpO₂ below 90%)",
+        "ta": "மிகக் குறைந்த ஆக்சிஜன் அளவு (SpO₂ 90%-க்குக் கீழ்)",
+        "hi": "ऑक्सीजन बहुत कम (SpO₂ 90% से कम)"
+      },
+      "when": {"vitalLt": {"spo2": 90}}
+    },
+    {
+      "id": "RF_HEART_RATE_EXTREME",
+      "label": {
+        "en": "Dangerously fast or slow heartbeat",
+        "ta": "ஆபத்தான வேகமான அல்லது மெதுவான இதயத் துடிப்பு",
+        "hi": "दिल की धड़कन ख़तरनाक रूप से तेज़ या धीमी"
+      },
       "when": {
-        "all": [
-          { "ageMonthsLt": 12 },
-          { "any": [{ "anySymptoms": ["high_fever"] }, { "temperatureCGte": 39 }] }
+        "any": [
+          {
+            "all": [{"ageMonthsGte": 144}, {"any": [{"vitalGte": {"heartRate": 150}}, {"vitalLt": {"heartRate": 40}}]}]
+          },
+          {"all": [{"ageKnown": false}, {"any": [{"vitalGte": {"heartRate": 150}}, {"vitalLt": {"heartRate": 40}}]}]},
+          {"all": [{"ageMonthsLt": 144}, {"any": [{"vitalGte": {"heartRate": 200}}, {"vitalLt": {"heartRate": 60}}]}]}
         ]
       }
     },
     {
-      "id": "RF_PREGNANCY_BLEEDING",
-      "label": { "en": "Bleeding during pregnancy", "ta": "கர்ப்ப காலத்தில் இரத்தப்போக்கு", "hi": "गर्भावस्था में खून आना" },
+      "id": "RF_BLOOD_PRESSURE_EXTREME",
+      "label": {
+        "en": "Dangerously high or low blood pressure",
+        "ta": "ஆபத்தான உயர் அல்லது குறைந்த இரத்த அழுத்தம்",
+        "hi": "ब्लड प्रेशर ख़तरनाक रूप से ज़्यादा या कम"
+      },
       "when": {
-        "all": [{ "pregnant": true }, { "anySymptoms": ["vaginal_bleeding", "severe_bleeding"] }]
+        "any": [
+          {"vitalGte": {"systolicBp": 180}},
+          {"vitalGte": {"diastolicBp": 120}},
+          {"all": [{"any": [{"ageMonthsGte": 144}, {"ageKnown": false}]}, {"vitalLt": {"systolicBp": 80}}]}
+        ]
       }
+    },
+    {
+      "id": "RF_VERY_HIGH_TEMPERATURE",
+      "label": {
+        "en": "Very high temperature (41 °C or more)",
+        "ta": "மிக அதிக உடல் வெப்பநிலை (41 °C அல்லது அதற்கு மேல்)",
+        "hi": "बहुत तेज़ बुखार (41 °C या ज़्यादा)"
+      },
+      "when": {"temperatureCGte": 41}
     }
   ],
   "floors": [
     {
       "id": "FLOOR_FEVER_AGE_UNKNOWN",
-      "label": { "en": "Fever with unknown age — needs a doctor within 24 hours", "ta": "வயது தெரியாத நிலையில் காய்ச்சல் — 24 மணி நேரத்திற்குள் மருத்துவர் பார்க்க வேண்டும்", "hi": "उम्र पता नहीं और बुखार है — 24 घंटे के अंदर डॉक्टर को दिखाएं" },
+      "label": {
+        "en": "Fever with unknown age — needs a doctor within 24 hours",
+        "ta": "வயது தெரியாத நிலையில் காய்ச்சல் — 24 மணி நேரத்திற்குள் மருத்துவர் பார்க்க வேண்டும்",
+        "hi": "उम्र पता नहीं और बुखार है — 24 घंटे के अंदर डॉक्टर को दिखाएं"
+      },
       "minLevel": "SEE_DOCTOR_24H",
       "when": {
-        "all": [
-          { "ageKnown": false },
-          { "any": [{ "anySymptoms": ["mild_fever", "high_fever"] }, { "temperatureCGte": 38 }] }
-        ]
+        "all": [{"ageKnown": false}, {"any": [{"anySymptoms": ["mild_fever", "high_fever"]}, {"temperatureCGte": 38}]}]
       }
     }
   ]
