@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import { Router } from 'express';
 import type { Env } from '../config/env';
 import { badRequest, conflict, notFound } from '../lib/httpError';
+import { generateTemporaryPassword } from '../lib/passwords';
 import { currentUser, requireRole } from '../middleware/auth';
 import { User } from '../models/user';
 import { Village } from '../models/village';
@@ -18,7 +19,7 @@ async function assertVillagesExist(ids: string[] | undefined) {
   if (found !== new Set(ids).size) throw badRequest('UNKNOWN_VILLAGE', 'One or more villages do not exist');
 }
 
-/** Staff account management. Admin only. */
+/** Staff account management. Admin only: the only place where a role can be set. */
 export function usersRouter(deps: { env: Pick<Env, 'BCRYPT_ROUNDS'> }) {
   const r = Router();
   r.use(requireRole('admin'));
@@ -43,11 +44,14 @@ export function usersRouter(deps: { env: Pick<Env, 'BCRYPT_ROUNDS'> }) {
       throw conflict('PHONE_TAKEN', 'An account with this phone number already exists');
     }
     const { password, ...rest } = body;
+    // Without a password, a temporary one is generated, shown once, and must be changed at first login.
+    const temporaryPassword = password ? undefined : generateTemporaryPassword();
     const user = await User.create({
       ...rest,
-      passwordHash: await bcrypt.hash(password, deps.env.BCRYPT_ROUNDS),
+      passwordHash: await bcrypt.hash(password ?? temporaryPassword!, deps.env.BCRYPT_ROUNDS),
+      mustChangePassword: !password,
     });
-    res.status(201).json(user.toJSON());
+    res.status(201).json({ ...user.toJSON(), ...(temporaryPassword ? { temporaryPassword } : {}) });
   });
 
   r.patch('/:id', async (req, res) => {
@@ -69,6 +73,22 @@ export function usersRouter(deps: { env: Pick<Env, 'BCRYPT_ROUNDS'> }) {
     if (revoke) user.tokenVersion += 1;
     await user.save();
     res.json(user.toJSON());
+  });
+
+  /** New temporary password for a staff account. Signs out all its devices. */
+  r.post('/:id/reset-password', async (req, res) => {
+    const { id } = IdParamsSchema.parse(req.params);
+    const user = await User.findById(id);
+    if (!user) throw notFound('User');
+    if (user.role === 'patient') {
+      throw badRequest('USE_PATIENT_RESET', "Reset a patient's password from their patient record");
+    }
+    const temporaryPassword = generateTemporaryPassword();
+    user.passwordHash = await bcrypt.hash(temporaryPassword, deps.env.BCRYPT_ROUNDS);
+    user.mustChangePassword = true;
+    user.tokenVersion += 1;
+    await user.save();
+    res.json({ phone: user.phone, temporaryPassword });
   });
 
   return r;

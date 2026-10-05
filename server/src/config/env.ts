@@ -41,6 +41,19 @@ const EnvSchema = z
     MQTT_PROVISION_DIR: z.string().default('../infra/mosquitto/generated'),
     SIMULATOR_DEVICES_FILE: z.string().default('../infra/mosquitto/generated/devices.json'),
 
+    // Onboarding: forgot-password OTPs and the public guest triage endpoint.
+    SMS_PROVIDER: z.enum(['console']).default('console'),
+    /** Echo the OTP in the API response (never in production). Defaults to on in development. */
+    OTP_DEV_ECHO: z
+      .enum(['true', 'false'])
+      .optional()
+      .transform((v) => (v === undefined ? undefined : v === 'true')),
+    OTP_TTL_SECONDS: z.coerce.number().int().min(60).max(3600).default(300),
+    OTP_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(10).default(5),
+    OTP_REQUESTS_PER_PHONE_PER_HOUR: z.coerce.number().int().min(1).max(20).default(3),
+    AUTH_RATE_LIMIT_PER_15MIN: z.coerce.number().int().min(1).default(20),
+    GUEST_TRIAGE_RATE_LIMIT_PER_10MIN: z.coerce.number().int().min(1).default(30),
+
     // Optional: create this admin on startup if no admin exists yet
     SEED_ADMIN_PHONE: z.string().optional(),
     SEED_ADMIN_PASSWORD: z.string().min(8).optional(),
@@ -55,7 +68,21 @@ const EnvSchema = z
       e.NODE_ENV !== 'production' ||
       ![e.JWT_ACCESS_SECRET, e.JWT_REFRESH_SECRET].some((s) => s.includes('change_me')),
     { message: 'Replace the example JWT secrets before running in production', path: ['JWT_ACCESS_SECRET'] },
-  );
+  )
+  .refine((e) => !(e.NODE_ENV === 'production' && e.OTP_DEV_ECHO === true), {
+    message: 'OTP_DEV_ECHO must not be enabled in production',
+    path: ['OTP_DEV_ECHO'],
+  });
+
+/** Onboarding settings derived from the environment (see AppDeps.onboarding). */
+export const onboardingConfig = (env: Env) => ({
+  otpDevEcho: env.OTP_DEV_ECHO ?? env.NODE_ENV === 'development',
+  otpTtlSeconds: env.OTP_TTL_SECONDS,
+  otpMaxAttempts: env.OTP_MAX_ATTEMPTS,
+  otpRequestsPerPhonePerHour: env.OTP_REQUESTS_PER_PHONE_PER_HOUR,
+  authRateLimitPer15Min: env.AUTH_RATE_LIMIT_PER_15MIN,
+  guestTriageRateLimitPer10Min: env.GUEST_TRIAGE_RATE_LIMIT_PER_10MIN,
+});
 
 export type Env = z.infer<typeof EnvSchema>;
 

@@ -8,6 +8,7 @@ The client ([`client/`](../client/)) is a React + TypeScript Progressive Web App
 | ---------------------------------------------------------- | ---------------------------------------- |
 | Open the app (every route), log-in session, language       | ✅ (after one online visit)              |
 | Triage wizard → result (rules, safety floors, model)       | ✅                                       |
+| Triage without an account (guest), kept only on the phone  | ✅                                       |
 | History of triages made on this device, pending-sync count | ✅                                       |
 | Patient list (health worker) for choosing the patient      | ✅ (cached from the last online visit)   |
 | Dashboards: alerts, review queue, vitals charts, stats     | Open, but show "needs internet"          |

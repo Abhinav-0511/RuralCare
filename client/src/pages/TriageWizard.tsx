@@ -8,6 +8,7 @@ import { useAuth } from '../lib/auth';
 import { useOnline } from '../lib/connectivity';
 import { usePatients } from '../lib/hooks';
 import { useModel } from '../model/ModelProvider';
+import { submitGuestTriage } from '../triage/guest';
 import { submitTriage } from '../triage/submit';
 import {
   BODY_AREAS,
@@ -114,7 +115,11 @@ interface SpeechRecognitionLike {
   start: () => void;
 }
 
-export default function TriageWizard() {
+/**
+ * The triage wizard. `guest`: used without an account; no patient step, and the result is kept
+ * only on this device (never synced). The steps, rules and model are the same.
+ */
+export default function TriageWizard({ guest = false }: { guest?: boolean }) {
   const { t, loc, locale } = useI18n();
   const { user } = useAuth();
   const online = useOnline();
@@ -122,7 +127,7 @@ export default function TriageWizard() {
   const patients = usePatients();
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const isStaff = user?.role !== 'patient';
+  const isStaff = !guest && user?.role !== 'patient';
 
   const steps: Step[] = useMemo(
     () => [
@@ -165,7 +170,7 @@ export default function TriageWizard() {
 
   // Patient: their own record. Staff: ?patient=<id> from a dashboard. Applied once, when the
   // (cached) patient list contains it — React's "adjust state during render" pattern.
-  const prefillId = isStaff ? params.get('patient') : user?.patientId;
+  const prefillId = guest ? null : isStaff ? params.get('patient') : user?.patientId;
   const [prefilledId, setPrefilledId] = useState<string | null>(null);
   if (prefillId && prefilledId !== prefillId && patients.some((p) => p.id === prefillId)) {
     setPrefilledId(prefillId);
@@ -198,7 +203,7 @@ export default function TriageWizard() {
 
   const submit = async () => {
     const patientId = draft.patientId ?? user?.patientId;
-    if (!patientId) return setError(t('wizard.patient.search'));
+    if (!guest && !patientId) return setError(t('wizard.patient.search'));
     const vitals: Vitals = {};
     for (const k of ['heartRate', 'spo2', 'systolicBp', 'diastolicBp'] as const) {
       if (draft.vitals[k]) vitals[k] = Math.round(Number(draft.vitals[k]));
@@ -218,8 +223,13 @@ export default function TriageWizard() {
     if (!parsed.success) return setError(t('common.error'));
     setBusy(true);
     try {
+      if (guest) {
+        const check = await submitGuestTriage({ input: parsed.data, online, predictor });
+        navigate(`/guest/result/${check.clientId}`);
+        return;
+      }
       const session = await submitTriage({
-        patientId,
+        patientId: patientId!,
         ...(draft.patientName ? { patientName: draft.patientName } : {}),
         input: parsed.data,
         online,

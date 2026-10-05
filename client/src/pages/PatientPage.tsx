@@ -11,9 +11,11 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { Card, formatDateTime, LevelBadge, Spinner } from '../components/ui';
+import { TempPasswordCard } from '../components/TempPasswordCard';
+import { Button, Card, ErrorBox, formatDateTime, LevelBadge, Spinner } from '../components/ui';
 import { useI18n } from '../i18n/I18nProvider';
 import type { StringKey } from '../i18n/strings';
+import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useOnline } from '../lib/connectivity';
 import { useApi } from '../lib/hooks';
@@ -31,6 +33,66 @@ interface PatientDto {
   name: string;
   ageMonths: number;
   sex: string;
+  phone?: string;
+  userId?: string;
+}
+
+/** Health worker / admin: a patient's login, with a password reset (new temporary password). */
+function LoginCard({ patient }: { patient: PatientDto }) {
+  const { t } = useI18n();
+  const [confirming, setConfirming] = useState(false);
+  const [temp, setTemp] = useState<{ phone: string; temporaryPassword: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const reset = async () => {
+    setError(null);
+    try {
+      setTemp(await api(`/api/patients/${patient.id}/reset-password`, { method: 'POST' }));
+      setConfirming(false);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
+  if (temp)
+    return (
+      <TempPasswordCard phone={temp.phone} password={temp.temporaryPassword} onDone={() => setTemp(null)} />
+    );
+  return (
+    <Card>
+      <h2 className="mb-2 font-semibold">{t('patient.login')}</h2>
+      {!patient.userId ? (
+        <p className="text-slate-600">{t('patient.noLogin')}</p>
+      ) : (
+        <div className="space-y-2">
+          <p className="font-mono">{patient.phone}</p>
+          {confirming ? (
+            <>
+              <p className="rounded-xl bg-amber-50 p-3 text-amber-900">{t('patient.resetConfirm')}</p>
+              <div className="flex gap-2">
+                <Button variant="secondary" className="flex-1" onClick={() => setConfirming(false)}>
+                  {t('common.cancel')}
+                </Button>
+                <Button
+                  variant="danger"
+                  className="flex-1"
+                  onClick={() => void reset()}
+                  data-testid="confirm-reset-password"
+                >
+                  {t('patient.resetPassword')}
+                </Button>
+              </div>
+            </>
+          ) : (
+            <Button variant="secondary" onClick={() => setConfirming(true)} data-testid="reset-password">
+              {t('patient.resetPassword')}
+            </Button>
+          )}
+          {error && <ErrorBox>{error}</ErrorBox>}
+        </div>
+      )}
+    </Card>
+  );
 }
 
 const CHARTS: { vitals: AlertVital[]; label: StringKey; domain: [number, number] }[] = [
@@ -78,6 +140,8 @@ export default function PatientPage() {
         <h1 className="text-2xl font-bold">{patient.data.name}</h1>
         <p className="text-slate-600">{t('patient.years', { n: Math.floor(patient.data.ageMonths / 12) })}</p>
       </div>
+
+      {(user?.role === 'health_worker' || user?.role === 'admin') && <LoginCard patient={patient.data} />}
 
       <Card>
         <h2 className="mb-2 font-semibold">{t('patient.vitals')}</h2>

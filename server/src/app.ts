@@ -9,9 +9,10 @@ import { createTokenService } from './lib/tokens';
 import { authenticate } from './middleware/auth';
 import { createErrorHandler, notFoundHandler } from './middleware/errorHandler';
 import { buildOpenApiDocument } from './openapi';
-import { authRouter } from './routes/auth';
+import { authRouter, type OnboardingConfig } from './routes/auth';
 import { alertsRouter } from './routes/alerts';
 import { dashboardRouter } from './routes/dashboard';
+import { guestRouter } from './routes/guest';
 import { modelRouter } from './routes/model';
 import { patientsRouter } from './routes/patients';
 import { triageRouter } from './routes/triage';
@@ -19,6 +20,7 @@ import { usersRouter } from './routes/users';
 import { villagesRouter } from './routes/villages';
 import { vitalsRouter } from './routes/vitals';
 import type { AiClient } from './services/aiClient';
+import { createConsoleSms, type SmsSender } from './services/sms';
 import type { VitalsStore } from './vitals/store';
 
 const startedAt = Date.now();
@@ -39,9 +41,23 @@ export interface AppDeps {
   vitals?: VitalsStore | null;
   /** MQTT ingestion status for /health. */
   mqttConnected?: () => boolean;
+  /** OTP and rate-limit settings; defaults below (OTP not echoed). */
+  onboarding?: Partial<OnboardingConfig>;
+  /** Outgoing SMS for password-reset codes; defaults to logging them. */
+  sms?: SmsSender;
 }
 
-export function createApp({ env, ai, vitals = null, mqttConnected }: AppDeps) {
+const ONBOARDING_DEFAULTS: OnboardingConfig = {
+  otpDevEcho: false,
+  otpTtlSeconds: 300,
+  otpMaxAttempts: 5,
+  otpRequestsPerPhonePerHour: 3,
+  authRateLimitPer15Min: 20,
+  guestTriageRateLimitPer10Min: 30,
+};
+
+export function createApp({ env, ai, vitals = null, mqttConnected, onboarding, sms }: AppDeps) {
+  const config = { ...ONBOARDING_DEFAULTS, ...onboarding };
   const app = express();
   const tokens = createTokenService(env);
   const requireAuth = authenticate(tokens);
@@ -87,11 +103,13 @@ export function createApp({ env, ai, vitals = null, mqttConnected }: AppDeps) {
     swaggerUi.setup(openApiDocument, { customSiteTitle: 'RuralCare API' }),
   );
 
-  app.use('/api/auth', authRouter({ tokens, env }));
+  app.use('/api/auth', authRouter({ tokens, env, config, sms: sms ?? createConsoleSms() }));
+  // Public, rate-limited, stores nothing.
+  app.use('/api/guest', guestRouter({ ai, ratePer10Min: config.guestTriageRateLimitPer10Min }));
   app.use('/api/villages', villagesRouter({ tokens }));
   app.use('/api/model', modelRouter({ ai }));
   app.use('/api/users', requireAuth, usersRouter({ env }));
-  app.use('/api/patients', requireAuth, patientsRouter());
+  app.use('/api/patients', requireAuth, patientsRouter({ env }));
   app.use('/api/triage', requireAuth, triageRouter({ ai, vitals }));
   app.use('/api/vitals', requireAuth, vitalsRouter({ store: vitals }));
   app.use('/api/alerts', requireAuth, alertsRouter());

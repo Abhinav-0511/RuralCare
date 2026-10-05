@@ -311,6 +311,281 @@ export const strings = {
     hi: 'इस पेज के लिए इंटरनेट चाहिए।',
   },
   'common.open': { en: 'Open', ta: 'திற', hi: 'खोलें' },
+  'common.save': { en: 'Save', ta: 'சேமி', hi: 'सेव करें' },
+  'common.cancel': { en: 'Cancel', ta: 'ரத்து செய்', hi: 'रद्द करें' },
+  'common.phoneInvalid': {
+    en: 'Enter a 10-digit mobile number.',
+    ta: '10 இலக்க கைபேசி எண்ணை உள்ளிடவும்.',
+    hi: '10 अंकों का मोबाइल नंबर डालें।',
+  },
+  'common.tooMany': {
+    en: 'Too many tries. Please wait and try again later.',
+    ta: 'அதிக முயற்சிகள். சிறிது நேரம் கழித்து மீண்டும் முயற்சிக்கவும்.',
+    hi: 'बहुत ज़्यादा कोशिशें। थोड़ी देर बाद फिर कोशिश करें।',
+  },
+
+  // ── Onboarding: guest triage ──
+  'login.guest': {
+    en: 'Check symptoms without an account',
+    ta: 'கணக்கு இல்லாமல் அறிகுறிகளைச் சரிபார்க்கவும்',
+    hi: 'बिना अकाउंट के लक्षण जाँचें',
+  },
+  'login.guestHint': {
+    en: 'Nothing is saved to a health record.',
+    ta: 'எதுவும் சுகாதாரப் பதிவில் சேமிக்கப்படாது.',
+    hi: 'कुछ भी स्वास्थ्य रिकॉर्ड में सेव नहीं होगा।',
+  },
+  'login.forgot': { en: 'Forgot password?', ta: 'கடவுச்சொல் மறந்துவிட்டதா?', hi: 'पासवर्ड भूल गए?' },
+  'login.newUser': {
+    en: 'New here? Ask your village health worker to register you.',
+    ta: 'புதியவரா? உங்கள் கிராம சுகாதாரப் பணியாளரிடம் உங்களைப் பதிவு செய்யச் சொல்லுங்கள்.',
+    hi: 'नए हैं? अपने गाँव के स्वास्थ्य कार्यकर्ता से खुद को रजिस्टर करवाएँ।',
+  },
+  'guest.title': {
+    en: 'Symptom check without an account',
+    ta: 'கணக்கு இல்லாமல் அறிகுறி சரிபார்ப்பு',
+    hi: 'बिना अकाउंट के लक्षण जाँच',
+  },
+  'guest.toLogin': {
+    en: 'Have an account? Log in',
+    ta: 'கணக்கு உள்ளதா? உள்நுழைக',
+    hi: 'अकाउंट है? लॉग इन करें',
+  },
+  'guest.notSaved': {
+    en: 'Not saved to a health record',
+    ta: 'சுகாதாரப் பதிவில் சேமிக்கப்படவில்லை',
+    hi: 'स्वास्थ्य रिकॉर्ड में सेव नहीं किया गया',
+  },
+  'guest.notSavedDetail': {
+    en: 'This result is kept only on this phone.',
+    ta: 'இந்த முடிவு இந்தத் தொலைபேசியில் மட்டுமே வைக்கப்படும்.',
+    hi: 'यह नतीजा सिर्फ़ इसी फ़ोन में रखा गया है।',
+  },
+  'guest.registerHint': {
+    en: 'To keep a health record, ask your village health worker to register you.',
+    ta: 'சுகாதாரப் பதிவை வைத்திருக்க, உங்கள் கிராம சுகாதாரப் பணியாளரிடம் உங்களைப் பதிவு செய்யச் சொல்லுங்கள்.',
+    hi: 'स्वास्थ्य रिकॉर्ड रखने के लिए, अपने गाँव के स्वास्थ्य कार्यकर्ता से खुद को रजिस्टर करवाएँ।',
+  },
+  'guest.newCheck': { en: 'New check', ta: 'புதிய சரிபார்ப்பு', hi: 'नई जाँच' },
+  'claim.question': {
+    en: 'You have {n} earlier checks on this phone. Add them to your record?',
+    ta: 'இந்தத் தொலைபேசியில் உங்களுக்கு {n} முந்தைய சரிபார்ப்புகள் உள்ளன. அவற்றை உங்கள் பதிவில் சேர்க்கவா?',
+    hi: 'इस फ़ोन पर आपकी {n} पिछली जाँचें हैं। क्या इन्हें अपने रिकॉर्ड में जोड़ें?',
+  },
+  'claim.hint': {
+    en: 'Only add them if these checks were about you.',
+    ta: 'இந்தச் சரிபார்ப்புகள் உங்களைப் பற்றியவை என்றால் மட்டுமே சேர்க்கவும்.',
+    hi: 'इन्हें तभी जोड़ें जब ये जाँचें आपके बारे में थीं।',
+  },
+  'claim.yes': { en: 'Yes, add them', ta: 'ஆம், சேர்க்கவும்', hi: 'हाँ, जोड़ें' },
+  'claim.no': { en: 'No', ta: 'வேண்டாம்', hi: 'नहीं' },
+  'claim.done': {
+    en: '{n} checks added to your record.',
+    ta: '{n} சரிபார்ப்புகள் உங்கள் பதிவில் சேர்க்கப்பட்டன.',
+    hi: '{n} जाँचें आपके रिकॉर्ड में जोड़ी गईं।',
+  },
+  'claim.failed': {
+    en: "Could not add them now. We'll ask again next time.",
+    ta: 'இப்போது சேர்க்க முடியவில்லை. அடுத்த முறை மீண்டும் கேட்போம்.',
+    hi: 'अभी नहीं जोड़ पाए। अगली बार फिर पूछेंगे।',
+  },
+
+  // ── Onboarding: passwords ──
+  'pw.title': { en: 'Set a new password', ta: 'புதிய கடவுச்சொல்லை அமைக்கவும்', hi: 'नया पासवर्ड बनाएँ' },
+  'pw.hint': {
+    en: 'You logged in with a temporary password. Choose your own password to continue.',
+    ta: 'நீங்கள் தற்காலிக கடவுச்சொல்லுடன் உள்நுழைந்துள்ளீர்கள். தொடர உங்கள் சொந்த கடவுச்சொல்லைத் தேர்ந்தெடுக்கவும்.',
+    hi: 'आपने अस्थायी पासवर्ड से लॉग इन किया है। आगे बढ़ने के लिए अपना पासवर्ड चुनें।',
+  },
+  'pw.current': {
+    en: 'Current (temporary) password',
+    ta: 'தற்போதைய (தற்காலிக) கடவுச்சொல்',
+    hi: 'मौजूदा (अस्थायी) पासवर्ड',
+  },
+  'pw.new': {
+    en: 'New password (at least 8 characters)',
+    ta: 'புதிய கடவுச்சொல் (குறைந்தது 8 எழுத்துகள்)',
+    hi: 'नया पासवर्ड (कम से कम 8 अक्षर)',
+  },
+  'pw.repeat': {
+    en: 'Repeat the new password',
+    ta: 'புதிய கடவுச்சொல்லை மீண்டும் உள்ளிடவும்',
+    hi: 'नया पासवर्ड दोबारा लिखें',
+  },
+  'pw.mismatch': {
+    en: 'The two passwords are not the same.',
+    ta: 'இரண்டு கடவுச்சொற்களும் ஒன்றாக இல்லை.',
+    hi: 'दोनों पासवर्ड एक जैसे नहीं हैं।',
+  },
+  'pw.tooShort': {
+    en: 'Use at least 8 characters.',
+    ta: 'குறைந்தது 8 எழுத்துகளைப் பயன்படுத்தவும்.',
+    hi: 'कम से कम 8 अक्षर रखें।',
+  },
+  'pw.same': {
+    en: 'Choose a password different from the temporary one.',
+    ta: 'தற்காலிக கடவுச்சொல்லிலிருந்து வேறுபட்ட கடவுச்சொல்லைத் தேர்ந்தெடுக்கவும்.',
+    hi: 'अस्थायी पासवर्ड से अलग पासवर्ड चुनें।',
+  },
+  'pw.wrongCurrent': {
+    en: 'The current password is wrong.',
+    ta: 'தற்போதைய கடவுச்சொல் தவறு.',
+    hi: 'मौजूदा पासवर्ड गलत है।',
+  },
+  'pw.save': { en: 'Save password', ta: 'கடவுச்சொல்லைச் சேமி', hi: 'पासवर्ड सेव करें' },
+  'forgot.title': {
+    en: 'Reset your password',
+    ta: 'உங்கள் கடவுச்சொல்லை மீட்டமைக்கவும்',
+    hi: 'अपना पासवर्ड रीसेट करें',
+  },
+  'forgot.hint': {
+    en: 'We will send a 6-digit code by SMS to your mobile.',
+    ta: 'உங்கள் கைபேசிக்கு SMS மூலம் 6 இலக்கக் குறியீட்டை அனுப்புவோம்.',
+    hi: 'हम आपके मोबाइल पर SMS से 6 अंकों का कोड भेजेंगे।',
+  },
+  'forgot.send': { en: 'Send code', ta: 'குறியீட்டை அனுப்பு', hi: 'कोड भेजें' },
+  'forgot.sent': {
+    en: 'If this number has an account, a code has been sent. It is valid for {min} minutes.',
+    ta: 'இந்த எண்ணுக்குக் கணக்கு இருந்தால், குறியீடு அனுப்பப்பட்டுள்ளது. இது {min} நிமிடங்கள் செல்லுபடியாகும்.',
+    hi: 'अगर इस नंबर का अकाउंट है, तो कोड भेज दिया गया है। यह {min} मिनट तक मान्य है।',
+  },
+  'forgot.code': { en: '6-digit code', ta: '6 இலக்கக் குறியீடு', hi: '6 अंकों का कोड' },
+  'forgot.devCode': {
+    en: 'Development mode, no SMS sent. Code: {code}',
+    ta: 'மேம்பாட்டு முறை, SMS அனுப்பப்படவில்லை. குறியீடு: {code}',
+    hi: 'डेवलपमेंट मोड, SMS नहीं भेजा गया। कोड: {code}',
+  },
+  'forgot.confirm': { en: 'Change password', ta: 'கடவுச்சொல்லை மாற்று', hi: 'पासवर्ड बदलें' },
+  'forgot.invalid': {
+    en: 'The code is wrong or has expired.',
+    ta: 'குறியீடு தவறு அல்லது காலாவதியானது.',
+    hi: 'कोड गलत है या उसकी समय-सीमा खत्म हो गई है।',
+  },
+  'forgot.done': {
+    en: 'Password changed. You can now log in.',
+    ta: 'கடவுச்சொல் மாற்றப்பட்டது. இப்போது உள்நுழையலாம்.',
+    hi: 'पासवर्ड बदल गया। अब आप लॉग इन कर सकते हैं।',
+  },
+  'forgot.noPhone': {
+    en: "Can't receive SMS? Your health worker can reset your password.",
+    ta: 'SMS பெற முடியவில்லையா? உங்கள் சுகாதாரப் பணியாளர் கடவுச்சொல்லை மீட்டமைக்கலாம்.',
+    hi: 'SMS नहीं आ रहा? आपका स्वास्थ्य कार्यकर्ता पासवर्ड रीसेट कर सकता है।',
+  },
+  'forgot.back': { en: 'Back to login', ta: 'உள்நுழைவுக்குத் திரும்பு', hi: 'लॉग इन पर वापस जाएँ' },
+  'temp.title': {
+    en: 'Temporary password, shown only once',
+    ta: 'தற்காலிக கடவுச்சொல், ஒருமுறை மட்டுமே காட்டப்படும்',
+    hi: 'अस्थायी पासवर्ड, सिर्फ़ एक बार दिखेगा',
+  },
+  'temp.hint': {
+    en: 'Give it to the person privately. They must choose a new password when they first log in.',
+    ta: 'இதை அந்த நபரிடம் தனிப்பட்ட முறையில் கொடுங்கள். முதல் முறை உள்நுழையும்போது அவர்கள் புதிய கடவுச்சொல்லைத் தேர்ந்தெடுக்க வேண்டும்.',
+    hi: 'इसे व्यक्ति को अकेले में दें। पहली बार लॉग इन करने पर उन्हें नया पासवर्ड चुनना होगा।',
+  },
+  'temp.login': { en: 'Login (mobile number)', ta: 'உள்நுழைவு (கைபேசி எண்)', hi: 'लॉगिन (मोबाइल नंबर)' },
+  'temp.password': { en: 'Temporary password', ta: 'தற்காலிக கடவுச்சொல்', hi: 'अस्थायी पासवर्ड' },
+  'temp.done': { en: 'I have noted it', ta: 'குறித்துக்கொண்டேன்', hi: 'मैंने लिख लिया' },
+
+  // ── Onboarding: patient registration (health worker) ──
+  'hw.register': {
+    en: 'Register new patient',
+    ta: 'புதிய நோயாளியைப் பதிவு செய்',
+    hi: 'नया मरीज़ रजिस्टर करें',
+  },
+  'reg.name': { en: 'Full name', ta: 'முழுப் பெயர்', hi: 'पूरा नाम' },
+  'reg.phone': {
+    en: 'Mobile number (optional)',
+    ta: 'கைபேசி எண் (விருப்பம்)',
+    hi: 'मोबाइल नंबर (वैकल्पिक)',
+  },
+  'reg.village': { en: 'Village', ta: 'கிராமம்', hi: 'गाँव' },
+  'reg.dob': { en: 'Date of birth', ta: 'பிறந்த தேதி', hi: 'जन्म तिथि' },
+  'reg.language': { en: 'Preferred language', ta: 'விருப்பமான மொழி', hi: 'पसंदीदा भाषा' },
+  'reg.createLogin': {
+    en: 'Create a login for this patient',
+    ta: 'இந்த நோயாளிக்கு உள்நுழைவை உருவாக்கவும்',
+    hi: 'इस मरीज़ के लिए लॉगिन बनाएँ',
+  },
+  'reg.createLoginHint': {
+    en: 'They can then see their own record and check symptoms. Needs their mobile number.',
+    ta: 'பின்னர் அவர்கள் தங்கள் பதிவைப் பார்த்து அறிகுறிகளைச் சரிபார்க்கலாம். அவர்களின் கைபேசி எண் தேவை.',
+    hi: 'फिर वे अपना रिकॉर्ड देख सकेंगे और लक्षण जाँच सकेंगे। उनका मोबाइल नंबर चाहिए।',
+  },
+  'reg.submit': { en: 'Register patient', ta: 'நோயாளியைப் பதிவு செய்', hi: 'मरीज़ रजिस्टर करें' },
+  'reg.required': {
+    en: 'Fill in name, village, sex and date of birth.',
+    ta: 'பெயர், கிராமம், பாலினம், பிறந்த தேதி ஆகியவற்றை நிரப்பவும்.',
+    hi: 'नाम, गाँव, लिंग और जन्म तिथि भरें।',
+  },
+  'reg.phoneForLogin': {
+    en: 'A mobile number is needed to create a login.',
+    ta: 'உள்நுழைவை உருவாக்க கைபேசி எண் தேவை.',
+    hi: 'लॉगिन बनाने के लिए मोबाइल नंबर चाहिए।',
+  },
+  'reg.duplicate': {
+    en: 'A patient with this mobile number is already registered. Check it is not the same person.',
+    ta: 'இந்தக் கைபேசி எண்ணுடன் ஒரு நோயாளி ஏற்கனவே பதிவு செய்யப்பட்டுள்ளார். அது அதே நபர் அல்ல என்பதைச் சரிபார்க்கவும்.',
+    hi: 'इस मोबाइल नंबर से एक मरीज़ पहले से रजिस्टर है। जाँच लें कि यह वही व्यक्ति नहीं है।',
+  },
+  'reg.registerAnyway': {
+    en: 'Different person, register anyway',
+    ta: 'வேறு நபர், இருந்தாலும் பதிவு செய்',
+    hi: 'अलग व्यक्ति है, फिर भी रजिस्टर करें',
+  },
+  'reg.phoneTaken': {
+    en: 'This mobile number already has a login. Register without a login, or use another number.',
+    ta: 'இந்தக் கைபேசி எண்ணுக்கு ஏற்கனவே உள்நுழைவு உள்ளது. உள்நுழைவு இல்லாமல் பதிவு செய்யவும், அல்லது வேறு எண்ணைப் பயன்படுத்தவும்.',
+    hi: 'इस मोबाइल नंबर का लॉगिन पहले से है। बिना लॉगिन के रजिस्टर करें, या दूसरा नंबर इस्तेमाल करें।',
+  },
+  'reg.done': {
+    en: '{name} is registered.',
+    ta: '{name} பதிவு செய்யப்பட்டார்.',
+    hi: '{name} रजिस्टर हो गए।',
+  },
+  'patient.login': { en: 'Login', ta: 'உள்நுழைவு', hi: 'लॉगिन' },
+  'patient.noLogin': {
+    en: 'This patient has no login.',
+    ta: 'இந்த நோயாளிக்கு உள்நுழைவு இல்லை.',
+    hi: 'इस मरीज़ का कोई लॉगिन नहीं है।',
+  },
+  'patient.resetPassword': { en: 'Reset password', ta: 'கடவுச்சொல்லை மீட்டமை', hi: 'पासवर्ड रीसेट करें' },
+  'patient.resetConfirm': {
+    en: 'Create a new temporary password? The old password stops working and all devices are logged out.',
+    ta: 'புதிய தற்காலிக கடவுச்சொல்லை உருவாக்கவா? பழைய கடவுச்சொல் வேலை செய்யாது, எல்லா சாதனங்களும் வெளியேற்றப்படும்.',
+    hi: 'नया अस्थायी पासवर्ड बनाएँ? पुराना पासवर्ड काम नहीं करेगा और सभी डिवाइस से लॉग आउट हो जाएगा।',
+  },
+
+  // ── Onboarding: admin ──
+  'nav.users': { en: 'Users', ta: 'பயனர்கள்', hi: 'यूज़र' },
+  'admin.users': { en: 'Staff accounts', ta: 'பணியாளர் கணக்குகள்', hi: 'स्टाफ़ अकाउंट' },
+  'admin.addUser': { en: 'Add staff member', ta: 'பணியாளரைச் சேர்', hi: 'स्टाफ़ जोड़ें' },
+  'admin.role': { en: 'Role', ta: 'பங்கு', hi: 'भूमिका' },
+  'role.health_worker': { en: 'Health worker', ta: 'சுகாதாரப் பணியாளர்', hi: 'स्वास्थ्य कार्यकर्ता' },
+  'role.doctor': { en: 'Doctor', ta: 'மருத்துவர்', hi: 'डॉक्टर' },
+  'role.admin': { en: 'Administrator', ta: 'நிர்வாகி', hi: 'प्रशासक' },
+  'admin.villages': { en: 'Villages', ta: 'கிராமங்கள்', hi: 'गाँव' },
+  'admin.assignVillages': {
+    en: 'Villages they serve',
+    ta: 'அவர்கள் சேவை செய்யும் கிராமங்கள்',
+    hi: 'वे किन गाँवों में काम करते हैं',
+  },
+  'admin.noVillages': {
+    en: 'No villages assigned',
+    ta: 'கிராமங்கள் ஒதுக்கப்படவில்லை',
+    hi: 'कोई गाँव नहीं दिया गया',
+  },
+  'admin.edit': { en: 'Edit', ta: 'திருத்து', hi: 'बदलें' },
+  'admin.deactivate': { en: 'Deactivate', ta: 'செயலிழக்கச் செய்', hi: 'निष्क्रिय करें' },
+  'admin.activate': { en: 'Activate', ta: 'செயல்படுத்து', hi: 'सक्रिय करें' },
+  'admin.inactive': { en: 'Inactive', ta: 'செயலில் இல்லை', hi: 'निष्क्रिय' },
+  'admin.addVillage': { en: 'Add village', ta: 'கிராமத்தைச் சேர்', hi: 'गाँव जोड़ें' },
+  'admin.villageName': { en: 'Village name', ta: 'கிராமத்தின் பெயர்', hi: 'गाँव का नाम' },
+  'admin.district': { en: 'District', ta: 'மாவட்டம்', hi: 'ज़िला' },
+  'admin.passwordHint': {
+    en: 'A temporary password is created and shown once.',
+    ta: 'ஒரு தற்காலிக கடவுச்சொல் உருவாக்கப்பட்டு ஒருமுறை காட்டப்படும்.',
+    hi: 'एक अस्थायी पासवर्ड बनेगा और एक बार दिखेगा।',
+  },
 } satisfies Record<string, Entry>;
 
 export type StringKey = keyof typeof strings;

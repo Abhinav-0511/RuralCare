@@ -1,9 +1,10 @@
 import mongoose from 'mongoose';
 import { createApp } from './app';
-import { loadEnv } from './config/env';
+import { loadEnv, onboardingConfig } from './config/env';
 import { connectDb } from './db';
 import { createHttpAiClient } from './services/aiClient';
 import { ensureAdmin } from './services/bootstrap';
+import { createSmsSender } from './services/sms';
 import { createVitalsHandler, type MqttIngestor, startMqttIngestor } from './vitals/ingest';
 import { VitalsStore } from './vitals/store';
 
@@ -36,7 +37,16 @@ if (vitals && env.MQTT_URL) {
   });
 }
 
-const app = createApp({ env, ai, vitals, ...(ingestor ? { mqttConnected: ingestor.isConnected } : {}) });
+const onboarding = onboardingConfig(env);
+if (onboarding.otpDevEcho) console.warn('OTP_DEV_ECHO is on: password-reset codes are returned by the API');
+const app = createApp({
+  env,
+  ai,
+  vitals,
+  onboarding,
+  sms: createSmsSender(env.SMS_PROVIDER),
+  ...(ingestor ? { mqttConnected: ingestor.isConnected } : {}),
+});
 
 const server = app.listen(env.PORT, () => {
   console.log(`ruralcare-server listening on :${env.PORT} (${env.NODE_ENV}), API docs at /api/docs`);

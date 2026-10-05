@@ -26,6 +26,9 @@ export interface User {
   villageIds: string[];
   patientId?: string;
   preferredLanguage: 'en' | 'ta' | 'hi';
+  isActive?: boolean;
+  /** Temporary password: the app shows only the change-password screen until it is changed. */
+  mustChangePassword?: boolean;
 }
 
 const TOKENS_KEY = 'ruralcare.tokens';

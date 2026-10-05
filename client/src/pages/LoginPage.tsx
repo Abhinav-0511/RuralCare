@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from 'react';
-import { Navigate, useNavigate } from 'react-router';
+import { Link, Navigate, useNavigate } from 'react-router';
 import { Button, Card, ErrorBox } from '../components/ui';
 import { LanguageSwitch, useI18n } from '../i18n/I18nProvider';
 import { ApiError } from '../lib/api';
@@ -76,7 +76,20 @@ export default function LoginPage() {
           <Button type="submit" disabled={busy} className="w-full">
             {t('login.submit')}
           </Button>
+          <Link to="/forgot-password" className="block text-center font-semibold text-teal-800 underline">
+            {t('login.forgot')}
+          </Link>
         </form>
+      </Card>
+      <Card className="mt-4 space-y-3">
+        {/* Works offline too: the wizard, rules and model are on the device. */}
+        <Link to="/guest" className="block" data-testid="guest-start">
+          <Button variant="secondary" className="w-full">
+            🩺 {t('login.guest')}
+          </Button>
+        </Link>
+        <p className="text-sm text-slate-600">{t('login.guestHint')}</p>
+        <p className="text-sm text-slate-700">{t('login.newUser')}</p>
       </Card>
     </main>
   );

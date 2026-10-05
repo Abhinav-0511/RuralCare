@@ -109,3 +109,41 @@ All done in Phase 5 and covered by client tests (`TriageWizard.test.tsx`, `offli
 - Symptom input is a checklist. Overall severity and duration are asked (§3.4), but not per symptom: "difficulty breathing" doesn't distinguish mild from severe, so it stays a red flag.
 - **Offline triage can't see device vitals.** The server adds them when the session syncs, and the app tells the user if the server's result differs ([PWA.md](PWA.md)).
 - Demo data (`npm run seed`) is triaged by the real rules and the real model (since Phase 3).
+
+## 6. Onboarding: guest triage and accounts
+
+### 6.1 Guest triage gives the same safety, and stores nothing
+
+Anyone can check symptoms without an account ("Check symptoms without an account" on the login screen). This must never be a weaker path:
+
+- **Same engine.** The guest wizard is the normal wizard. Online, `POST /api/guest/triage` calls the same `evaluateTriage()` as `/api/triage`; offline, the device runs the same `runLocalTriage()`. Red flags give EMERGENCY with the Call 108 button, safety floors apply, the disclaimer is shown, and a model outage falls back to rules-only (never SELF_CARE). Tests: `server/test/guest.test.ts` (same level, source and floors as a staff triage) and `client/src/triage/guest.test.ts` (red flag offline without a model).
+- **Age is required** for guests too.
+- **Always an answer.** If the guest endpoint is rate-limited (`429`), down (`5xx`) or unreachable, the phone decides on its own with the same rules. A rate limit can never block an emergency result.
+- **Nothing on the server.** The endpoint writes nothing (a test compares every collection before and after) and answers `Cache-Control: no-store`. The result is kept only in the phone's IndexedDB (`guestChecks`), outside the sync outbox, and is marked **"Not saved to a health record"** on screen.
+- **Trade-off:** a guest check can't use device vitals (there is no patient to link them to), and no doctor will review it. The result screen tells the guest to ask their village health worker to register them.
+
+### 6.2 Adding guest checks to a record
+
+When a patient logs in for the first time on a phone with guest checks, the app asks _"You have N earlier checks on this phone. Add them to your record?"_ and lists their dates and levels. **Phones are often shared in a family**, so this is a question, not automatic, and the hint says to add them only if they were about this person. Added checks are re-evaluated by the server like any offline sync (the server's verdict wins and differences are shown) and stored with `origin: "guest"`, so a doctor can see they were entered without a known patient. If the patient says no, the checks stay on the phone and the question is not asked again for that user on that phone.
+
+### 6.3 Who can create accounts
+
+- **No self sign-up.** No public endpoint can create an account; `POST /api/auth/register` returns `410`. A test posts a would-be account to every unauthenticated endpoint and checks that no user appears.
+- **Patients are registered by their health worker,** and only in the health worker's own villages. The patient login's role is fixed to `patient` by the server.
+- **Roles are set only by an admin** (`/api/users`, admin-only). Patient accounts can't be turned into staff accounts.
+- **Duplicate patients:** registering a phone number that another patient already has gives a warning (`DUPLICATE_PHONE`). The health worker can still register a different person with the same number (a shared family phone is common). A phone number can belong to only one login.
+
+### 6.4 Passwords
+
+- **Temporary passwords** (created by a health worker or admin) are shown once and stored only as a bcrypt hash. Until the user picks their own password, every endpoint except change-password, `/me` and logout answers `403 PASSWORD_CHANGE_REQUIRED`, and the app shows only the change-password screen.
+- **Resets revoke sessions.** A health worker or admin reset, a self-service OTP reset and a password change all bump the user's token version, so every existing access and refresh token stops working at once.
+- **Forgot password by SMS code:** 6 digits, valid 5 minutes, single use, at most 5 wrong tries per code, 3 codes per phone per hour, and a per-IP limit. Only an HMAC of the code is stored.
+- **No phone-number enumeration.** The request endpoint gives the same answer (and the same rate limit) for numbers with and without an account. Records are kept for unknown numbers too. In development, a code is echoed for every number, and it only works for real accounts. Every confirm failure is the same `INVALID_OTP`. Login already answered wrong-password and unknown-phone identically.
+- **SMS is mocked** (the server logs the code). Echoing the code in the API response (`OTP_DEV_ECHO`) is refused in production.
+- **Without access to their phone,** a patient asks their health worker for a reset, and staff ask an admin.
+
+### 6.5 Known limitations
+
+- Rate limits are kept in memory in one server process. Several replicas (Phase 6, Kubernetes) need a shared store such as Redis.
+- Temporary passwords are handed over in person. Nothing enforces how the health worker passes them on.
+- A guest check on a shared phone could be added to the wrong person's record if they answer "yes" carelessly. The list of dates and levels in the question, and the `guest` origin seen by doctors, reduce this but cannot prevent it.

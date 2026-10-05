@@ -46,12 +46,25 @@ symptoms ──► RED-FLAG RULE ENGINE ──(red flag hit)──► EMERGENCY 
 
 ### Roles
 
-| Role            | Can do                                                                                  |
-| --------------- | --------------------------------------------------------------------------------------- |
-| `patient`       | Run triage, view their own history and vitals                                           |
-| `health_worker` | Run triage on behalf of patients (ASHA / field-worker workflow), view assigned patients |
-| `doctor`        | Review triage sessions and vitals, add notes                                            |
-| `admin`         | Manage users, roles, model versions                                                     |
+| Role            | Can do                                                                                                                                              |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| _guest_         | No account. Check symptoms (online or offline); the result stays on the phone and is not saved to a health record                                   |
+| `patient`       | Run triage, view their own history and vitals. Accounts are created by a health worker only                                                         |
+| `health_worker` | Run triage on behalf of patients (ASHA / field-worker workflow), view assigned patients, register patients in their villages, reset their passwords |
+| `doctor`        | Review triage sessions and vitals, add notes                                                                                                        |
+| `admin`         | Create, edit and deactivate staff accounts, assign villages, manage villages. The only role that can set roles                                      |
+
+### How a new user gets started
+
+There is **no self sign-up**. Accounts come from people the user already knows:
+
+1. **Anyone, no account:** on the login screen, tap **"Check symptoms without an account"**. The full triage works, including offline, with the same safety rules and the Call 108 button. The result is kept only on that phone.
+2. **Becoming a patient:** the village **health worker** taps **"Register new patient"** (name, mobile, village, sex, date of birth, language) and can tick **"Create a login"**. The app shows a **temporary password once**; the health worker gives it to the patient.
+3. **First login:** the patient logs in with their mobile number and the temporary password, and must **choose their own password**. If they used the app as a guest on that phone, they are asked **"You have N earlier checks on this phone. Add them to your record?"**
+4. **Staff:** an **admin** creates health workers and doctors (Users page), assigns villages, and gets a temporary password to hand over. The same first-login rule applies.
+5. **Forgot password:** "Forgot password?" on the login screen sends a 6-digit code by SMS (mocked: the code is logged by the server and shown in the app in development). Without access to that phone, the health worker (patients) or admin (staff) can reset it.
+
+Details: [docs/API.md](docs/API.md#onboarding-and-accounts) and [docs/SAFETY.md](docs/SAFETY.md#6-onboarding-guest-triage-and-accounts).
 
 ---
 
@@ -101,7 +114,7 @@ docker compose -f infra/docker-compose.yml exec edge-simulator \
 
 The critical alert appears in `GET /api/alerts`. A triage for that patient in the next 30 minutes becomes EMERGENCY (`RF_LOW_OXYGEN`), even after normal readings resume.
 
-**Demo logins.** Every account uses the password `RuralCare@123`. The seed wipes existing data.
+**Demo logins.** Every account uses the password `RuralCare@123`. The seed (and therefore the e2e suite's setup) wipes existing data. **Forgot-password codes** appear in the server log (`docker compose -f infra/docker-compose.yml logs server`) and, in development, on screen.
 
 | Role          | Phone                                                                                                                |
 | ------------- | -------------------------------------------------------------------------------------------------------------------- |
@@ -168,4 +181,5 @@ Full details and deliberate trade-offs are in **[docs/SAFETY.md](docs/SAFETY.md)
 - The rule engine runs **before** the model on every path: offline client, online server, and AI service.
 - If the AI service is unavailable, triage still works on the rules alone. The result is at least `SEE_DOCTOR_SOON` and says that the model was unavailable. It is never a silent `SELF_CARE`.
 - Age is required. If an offline record arrives without age and shows fever, the result is at least `SEE_DOCTOR_24H`.
+- Triage without an account uses exactly the same rules and model, works offline, and stores nothing on the server.
 - Rule definitions live in a single shared source ([`shared/`](shared/README.md)). The TypeScript and Python engines must both pass the same golden test cases, so the offline and online paths cannot drift apart.

@@ -1,5 +1,5 @@
 import type { Request, RequestHandler } from 'express';
-import { forbidden, unauthorized } from '../lib/httpError';
+import { forbidden, HttpError, unauthorized } from '../lib/httpError';
 import type { TokenService } from '../lib/tokens';
 import { type Role, User } from '../models/user';
 
@@ -9,6 +9,7 @@ export interface AuthUser {
   role: Role;
   villageIds: string[];
   patientId: string | null;
+  mustChangePassword: boolean;
 }
 
 declare module 'express-serve-static-core' {
@@ -20,8 +21,14 @@ declare module 'express-serve-static-core' {
 /**
  * Verifies the bearer access token and loads the user on every request, so deactivation,
  * logout (token version bump) and village reassignment take effect immediately.
+ *
+ * A user with a temporary password is refused everywhere (403 PASSWORD_CHANGE_REQUIRED) except
+ * on routes that pass `allowPendingPasswordChange` (change password, /me, logout).
  */
-export function authenticate(tokens: TokenService): RequestHandler {
+export function authenticate(
+  tokens: TokenService,
+  opts: { allowPendingPasswordChange?: boolean } = {},
+): RequestHandler {
   return async (req, _res, next) => {
     const header = req.headers.authorization;
     if (!header?.startsWith('Bearer ')) throw unauthorized();
@@ -30,6 +37,9 @@ export function authenticate(tokens: TokenService): RequestHandler {
     const user = await User.findById(claims.sub);
     if (!user || user.tokenVersion !== claims.tv) throw unauthorized('Session expired, please log in again');
     if (!user.isActive) throw forbidden('Account is disabled');
+    if (user.mustChangePassword && !opts.allowPendingPasswordChange) {
+      throw new HttpError(403, 'PASSWORD_CHANGE_REQUIRED', 'Please set a new password first');
+    }
 
     req.user = {
       id: user.id,
@@ -37,6 +47,7 @@ export function authenticate(tokens: TokenService): RequestHandler {
       role: user.role,
       villageIds: user.villageIds.map(String),
       patientId: user.patientId ? String(user.patientId) : null,
+      mustChangePassword: user.mustChangePassword ?? false,
     };
     next();
   };

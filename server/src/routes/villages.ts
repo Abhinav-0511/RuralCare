@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import type { TokenService } from '../lib/tokens';
 import { authenticate, requireRole } from '../middleware/auth';
+import { notFound } from '../lib/httpError';
 import { Village } from '../models/village';
-import { CreateVillageBodySchema } from '../schemas/api';
+import { CreateVillageBodySchema, IdParamsSchema, UpdateVillageBodySchema } from '../schemas/api';
 
 export function villagesRouter(deps: { tokens: TokenService }) {
   const r = Router();
@@ -16,6 +17,16 @@ export function villagesRouter(deps: { tokens: TokenService }) {
   r.post('/', authenticate(deps.tokens), requireRole('admin'), async (req, res) => {
     const village = await Village.create(CreateVillageBodySchema.parse(req.body));
     res.status(201).json(village.toJSON());
+  });
+
+  r.patch('/:id', authenticate(deps.tokens), requireRole('admin'), async (req, res) => {
+    const { id } = IdParamsSchema.parse(req.params);
+    const village = await Village.findByIdAndUpdate(id, UpdateVillageBodySchema.parse(req.body), {
+      new: true,
+      runValidators: true,
+    });
+    if (!village) throw notFound('Village');
+    res.json(village.toJSON());
   });
 
   return r;

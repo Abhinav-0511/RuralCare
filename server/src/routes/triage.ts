@@ -8,6 +8,7 @@ import { type AuthUser, currentUser, requireRole } from '../middleware/auth';
 import { Patient } from '../models/patient';
 import { TriageSession } from '../models/triageSession';
 import {
+  GuestClaimBodySchema,
   IdParamsSchema,
   ListSessionsQuerySchema,
   NoteBodySchema,
@@ -101,6 +102,30 @@ export function triageRouter(deps: TriageDeps) {
     for (const item of sessions) {
       try {
         results.push(await syncOne(user, item, deps));
+      } catch (err) {
+        if (!(err instanceof HttpError)) throw err;
+        results.push({
+          clientId: item.clientId,
+          status: 'rejected',
+          error: { code: err.code, message: err.message },
+        });
+      }
+    }
+    res.json({ results });
+  });
+
+  /**
+   * A patient adds checks they made as a guest on this phone to their own record. Each one is
+   * re-evaluated exactly like an offline sync and stored with origin "guest".
+   */
+  r.post('/guest-claims', requireRole('patient'), async (req, res) => {
+    const user = currentUser(req);
+    if (!user.patientId) throw badRequest('PATIENT_REQUIRED', 'This account has no patient record');
+    const { sessions } = GuestClaimBodySchema.parse(req.body);
+    const results: z.input<typeof SyncResultItemSchema>[] = [];
+    for (const item of sessions) {
+      try {
+        results.push(await syncOne(user, { ...item, patientId: user.patientId }, deps, 'guest'));
       } catch (err) {
         if (!(err instanceof HttpError)) throw err;
         results.push({
@@ -208,6 +233,7 @@ async function syncOne(
   user: AuthUser,
   item: z.output<typeof SyncItemSchema>,
   deps: TriageDeps,
+  origin: 'offline_sync' | 'guest' = 'offline_sync',
 ): Promise<z.input<typeof SyncResultItemSchema>> {
   const patient = await loadAccessiblePatient(user, item.patientId);
 
@@ -238,7 +264,7 @@ async function syncOne(
     patientId: patient._id,
     villageId: patient.villageId,
     performedBy: new Types.ObjectId(user.id),
-    origin: 'offline_sync',
+    origin,
     occurredAt,
     input: withVitals.input,
     vitalsSource: withVitals.vitalsSource,

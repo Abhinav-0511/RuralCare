@@ -44,6 +44,21 @@ export interface LocalSession {
   differenceSeen?: boolean;
 }
 
+/**
+ * A check made without an account (guest). Kept only on this device and never synced, unless a
+ * patient later logs in here and chooses to add it to their record.
+ */
+export interface GuestCheck {
+  clientId: string;
+  createdAt: string;
+  input: TriageContext;
+  level: TriageLevelId;
+  source: ResultSource;
+  rulesVersion: string;
+  modelVersion?: string;
+  guidance: GuidanceView;
+}
+
 export interface CachedPatient {
   id: string;
   name: string;
@@ -64,6 +79,7 @@ export class RuralCareDb extends Dexie {
   sessions!: EntityTable<LocalSession, 'clientId'>;
   patients!: EntityTable<CachedPatient, 'id'>;
   model!: EntityTable<StoredModel, 'key'>;
+  guestChecks!: EntityTable<GuestCheck, 'clientId'>;
 
   constructor(name = 'ruralcare') {
     super(name);
@@ -72,6 +88,8 @@ export class RuralCareDb extends Dexie {
       patients: 'id, name',
       model: 'key',
     });
+    // v2 (onboarding) only adds a table; existing data is kept.
+    this.version(2).stores({ guestChecks: 'clientId, createdAt' });
   }
 }
 

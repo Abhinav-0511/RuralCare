@@ -66,6 +66,10 @@ export const UserSchema = z
     patientId: ObjectIdSchema.optional(),
     preferredLanguage: z.enum(LOCALES),
     isActive: z.boolean(),
+    mustChangePassword: z
+      .boolean()
+      .optional()
+      .meta({ description: 'Temporary password: only /api/auth/change-password, /me and /logout work' }),
     ...timestamps,
   })
   .meta({ id: 'User' });
@@ -96,11 +100,52 @@ export const LoginBodySchema = z
 
 export const RefreshBodySchema = z.object({ refreshToken: z.string().min(1) }).meta({ id: 'RefreshBody' });
 
+export const ChangePasswordBodySchema = z
+  .object({ currentPassword: z.string().min(1), newPassword: PasswordSchema })
+  .refine((b) => b.newPassword !== b.currentPassword, {
+    message: 'The new password must be different',
+    path: ['newPassword'],
+  })
+  .meta({ id: 'ChangePasswordBody' });
+
+export const OtpRequestBodySchema = z.object({ phone: PhoneSchema }).meta({ id: 'OtpRequestBody' });
+
+export const OtpRequestResponseSchema = z
+  .object({
+    message: z.string(),
+    expiresInSeconds: z.number().int(),
+    devOtp: z.string().optional().meta({
+      description:
+        'Development only (OTP_DEV_ECHO). Present for EVERY phone number, so it does not reveal which numbers exist; it only works for real accounts.',
+    }),
+  })
+  .meta({ id: 'OtpRequestResponse' });
+
+export const OtpConfirmBodySchema = z
+  .object({
+    phone: PhoneSchema,
+    otp: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code'),
+    newPassword: PasswordSchema,
+  })
+  .meta({ id: 'OtpConfirmBody' });
+
+export const MessageSchema = z.object({ message: z.string() }).meta({ id: 'Message' });
+
+export const TemporaryLoginSchema = z
+  .object({
+    phone: z.string(),
+    temporaryPassword: z.string().meta({ description: 'Shown once. Must be changed at first login.' }),
+  })
+  .meta({ id: 'TemporaryLogin' });
+
 export const CreateUserBodySchema = z
   .object({
     name: z.string().trim().min(2).max(100),
     phone: PhoneSchema,
-    password: PasswordSchema,
+    password: PasswordSchema.optional().meta({
+      description:
+        'If omitted, a temporary password is generated and returned once (must be changed at first login)',
+    }),
     role: z.enum(['health_worker', 'doctor', 'admin']),
     email: z.email().optional(),
     villageIds: z.array(ObjectIdSchema).max(50).optional(),
@@ -114,9 +159,17 @@ export const UpdateUserBodySchema = z
     role: z.enum(['health_worker', 'doctor', 'admin']).optional(),
     villageIds: z.array(ObjectIdSchema).max(50).optional(),
     isActive: z.boolean().optional(),
+    preferredLanguage: z.enum(LOCALES).optional(),
   })
   .refine((b) => Object.keys(b).length > 0, 'Provide at least one field to update')
   .meta({ id: 'UpdateUserBody' });
+
+export const CreatedUserSchema = UserSchema.extend({
+  temporaryPassword: z
+    .string()
+    .optional()
+    .meta({ description: 'Only when no password was given; shown once' }),
+}).meta({ id: 'CreatedUser' });
 
 export const ListUsersQuerySchema = PaginationQuerySchema.extend({ role: RoleSchema.optional() });
 export const UserListSchema = paginated(UserSchema).meta({ id: 'UserList' });
@@ -143,6 +196,16 @@ export const CreateVillageBodySchema = z
   })
   .meta({ id: 'CreateVillageBody' });
 
+export const UpdateVillageBodySchema = z
+  .object({
+    name: z.string().trim().min(2).max(100).optional(),
+    district: z.string().trim().min(2).max(100).optional(),
+    state: z.string().trim().min(2).max(100).optional(),
+    location: z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }).optional(),
+  })
+  .refine((b) => Object.keys(b).length > 0, 'Provide at least one field to update')
+  .meta({ id: 'UpdateVillageBody' });
+
 export const PatientSchema = z
   .object({
     id: ObjectIdSchema,
@@ -165,8 +228,23 @@ export const CreatePatientBodySchema = z
     dateOfBirth: DateOfBirthSchema,
     villageId: ObjectIdSchema,
     phone: PhoneSchema.optional(),
+    preferredLanguage: z.enum(LOCALES).optional().meta({ description: 'For the login, if one is created' }),
+    createLogin: z.boolean().optional().meta({
+      description: 'Also create a patient login (phone required); a temporary password is returned once',
+    }),
+    allowDuplicatePhone: z.boolean().optional().meta({
+      description: 'Register even if another patient has this phone (e.g. a shared family phone)',
+    }),
+  })
+  .refine((b) => !b.createLogin || b.phone, {
+    message: 'A phone number is needed for a login',
+    path: ['phone'],
   })
   .meta({ id: 'CreatePatientBody' });
+
+export const CreatedPatientSchema = PatientSchema.extend({
+  login: TemporaryLoginSchema.optional(),
+}).meta({ id: 'CreatedPatient' });
 
 export const ListPatientsQuerySchema = PaginationQuerySchema.extend({
   villageId: ObjectIdSchema.optional(),
@@ -235,6 +313,19 @@ export const SyncResultItemSchema = z
 export const SyncResponseSchema = z
   .object({ results: z.array(SyncResultItemSchema) })
   .meta({ id: 'SyncResponse' });
+
+export const GuestTriageBodySchema = z
+  .object({ input: TriageInputBodySchema })
+  .meta({ id: 'GuestTriageRequest' });
+
+export const GuestClaimBodySchema = z
+  .object({
+    sessions: z
+      .array(SyncItemSchema.omit({ patientId: true }))
+      .min(1)
+      .max(50),
+  })
+  .meta({ id: 'GuestClaimRequest' });
 
 export const TriageSessionSchema = z
   .object({
@@ -309,6 +400,14 @@ export const GuidanceSchema = z
 export const TriageResponseSchema = z
   .object({ session: TriageSessionSchema, guidance: GuidanceSchema, duplicate: z.boolean() })
   .meta({ id: 'TriageResponse' });
+
+export const GuestTriageResponseSchema = z
+  .object({
+    result: TriageSessionSchema.shape.result,
+    guidance: GuidanceSchema,
+    stored: z.literal(false).meta({ description: 'Guest results are never stored on the server' }),
+  })
+  .meta({ id: 'GuestTriageResponse' });
 
 export const SessionWithGuidanceSchema = z
   .object({ session: TriageSessionSchema, guidance: GuidanceSchema })

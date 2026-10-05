@@ -5,6 +5,7 @@ import { useAuth } from '../lib/auth';
 import { useOnline } from '../lib/connectivity';
 import { useModel } from '../model/ModelProvider';
 import { useSync } from '../triage/SyncProvider';
+import { GuestClaimPrompt } from './GuestClaimPrompt';
 
 const NAV: Record<string, { to: string; label: StringKey; icon: string }[]> = {
   patient: [
@@ -24,24 +25,48 @@ const NAV: Record<string, { to: string; label: StringKey; icon: string }[]> = {
   ],
   admin: [
     { to: '/admin', label: 'nav.dashboard', icon: '📊' },
+    { to: '/admin/users', label: 'nav.users', icon: '👥' },
     { to: '/review', label: 'nav.review', icon: '🩺' },
     { to: '/history', label: 'nav.history', icon: '🕘' },
   ],
 };
 
-export function StatusBar() {
+export function OnlineBadge() {
   const online = useOnline();
+  const { t } = useI18n();
+  return (
+    <span
+      data-testid="online-status"
+      data-online={online}
+      className={`rounded-full px-2.5 py-1 text-sm font-semibold ${online ? 'bg-emerald-100 text-emerald-900' : 'bg-slate-700 text-white'}`}
+    >
+      {online ? '● ' + t('status.online') : '○ ' + t('status.offline')}
+    </span>
+  );
+}
+
+export function ModelStatus() {
+  const { t } = useI18n();
+  const model = useModel();
+  return (
+    <p
+      className="mt-6 text-center text-xs text-slate-500"
+      data-testid="model-status"
+      data-status={model.status}
+    >
+      {model.predictor
+        ? t('model.ready', { version: model.predictor.metadata.modelVersion })
+        : t('model.none')}
+    </p>
+  );
+}
+
+export function StatusBar() {
   const { pending, syncing } = useSync();
   const { t } = useI18n();
   return (
     <div className="flex flex-wrap items-center gap-2 text-sm">
-      <span
-        data-testid="online-status"
-        data-online={online}
-        className={`rounded-full px-2.5 py-1 font-semibold ${online ? 'bg-emerald-100 text-emerald-900' : 'bg-slate-700 text-white'}`}
-      >
-        {online ? '● ' + t('status.online') : '○ ' + t('status.offline')}
-      </span>
+      <OnlineBadge />
       <span
         data-testid="pending-count"
         data-count={pending}
@@ -60,7 +85,6 @@ export function StatusBar() {
 export function Layout() {
   const { user, logout } = useAuth();
   const { t } = useI18n();
-  const model = useModel();
   const items = NAV[user?.role ?? 'patient'] ?? [];
 
   return (
@@ -85,16 +109,9 @@ export function Layout() {
       </header>
 
       <main className="flex-1 px-4 py-4 pb-28">
+        {user?.role === 'patient' && <GuestClaimPrompt />}
         <Outlet />
-        <p
-          className="mt-6 text-center text-xs text-slate-500"
-          data-testid="model-status"
-          data-status={model.status}
-        >
-          {model.predictor
-            ? t('model.ready', { version: model.predictor.metadata.modelVersion })
-            : t('model.none')}
-        </p>
+        <ModelStatus />
       </main>
 
       {user && (
@@ -103,6 +120,7 @@ export function Layout() {
             <NavLink
               key={i.to}
               to={i.to}
+              end
               className={({ isActive }) =>
                 `flex min-h-16 flex-1 flex-col items-center justify-center text-xs ${isActive ? 'font-bold text-teal-800' : 'text-slate-600'}`
               }

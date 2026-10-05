@@ -7,7 +7,8 @@ import {
 } from '@ruralcare/shared';
 import { model, Schema, type Types } from 'mongoose';
 
-export const SESSION_ORIGINS = ['online', 'offline_sync', 'seed'] as const;
+// 'guest': a check made without an account on the patient's phone, added to their record later.
+export const SESSION_ORIGINS = ['online', 'offline_sync', 'seed', 'guest'] as const;
 export const TRIAGE_SOURCES = ['rule_engine', 'model', 'rule_engine_fallback'] as const;
 export const MODEL_STATUSES = ['ok', 'unavailable', 'not_called'] as const;
 export const REVIEW_STATUSES = ['pending', 'reviewed'] as const;

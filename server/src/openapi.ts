@@ -31,13 +31,12 @@ export function buildOpenApiDocument() {
     method: 'post',
     path: '/api/auth/register',
     tags: ['Auth'],
-    summary: 'Patient self-registration',
-    request: body(S.RegisterBodySchema),
-    responses: {
-      201: json(S.AuthResponseSchema, 'Registered'),
-      400: errors[400],
-      409: json(S.ErrorSchema, 'Phone already registered'),
-    },
+    summary: 'Disabled: patient self-registration',
+    description:
+      'Always `410 SELF_REGISTRATION_DISABLED`; no account is created. Patients are registered by a ' +
+      'health worker (`POST /api/patients` with `createLogin`), staff by an admin (`POST /api/users`).',
+    deprecated: true,
+    responses: { 410: json(S.ErrorSchema, 'Self-registration is disabled') },
   });
   path({
     method: 'post',
@@ -75,6 +74,49 @@ export function buildOpenApiDocument() {
     security: secured,
     responses: { 200: json(S.UserSchema, 'Current user'), 401: errors[401] },
   });
+  path({
+    method: 'post',
+    path: '/api/auth/change-password',
+    tags: ['Auth'],
+    summary: 'Set a new password (required after a temporary one)',
+    description:
+      'Revokes all other sessions and returns a new token pair. Allowed while `mustChangePassword` is set.',
+    security: secured,
+    request: body(S.ChangePasswordBodySchema),
+    responses: {
+      200: json(S.AuthResponseSchema, 'Password changed'),
+      400: errors[400],
+      401: json(S.ErrorSchema, 'Wrong current password or invalid token'),
+    },
+  });
+  path({
+    method: 'post',
+    path: '/api/auth/password-reset/request',
+    tags: ['Auth'],
+    summary: 'Forgot password: send a 6-digit code by SMS',
+    description:
+      'Same answer whether or not the phone has an account. Limits: per phone per hour, and per IP. ' +
+      'The code expires after OTP_TTL_SECONDS (default 5 min); a new request replaces the old code.',
+    request: body(S.OtpRequestBodySchema),
+    responses: {
+      202: json(S.OtpRequestResponseSchema, 'Accepted (a code is sent only if the account exists)'),
+      400: errors[400],
+      429: json(S.ErrorSchema, 'Too many requests'),
+    },
+  });
+  path({
+    method: 'post',
+    path: '/api/auth/password-reset/confirm',
+    tags: ['Auth'],
+    summary: 'Forgot password: set a new password with the code',
+    description: 'Wrong, expired, used or unknown codes all give `400 INVALID_OTP`. Revokes all sessions.',
+    request: body(S.OtpConfirmBodySchema),
+    responses: {
+      200: json(S.MessageSchema, 'Password changed'),
+      400: json(S.ErrorSchema, 'INVALID_OTP or validation error'),
+      429: json(S.ErrorSchema, 'Too many requests'),
+    },
+  });
 
   // ── Users (admin) ──
   path({
@@ -93,7 +135,24 @@ export function buildOpenApiDocument() {
     summary: 'Create a staff account (admin)',
     security: secured,
     request: body(S.CreateUserBodySchema),
-    responses: { 201: json(S.UserSchema, 'Created'), ...errors, 409: json(S.ErrorSchema, 'Phone taken') },
+    responses: {
+      201: json(S.CreatedUserSchema, 'Created'),
+      ...errors,
+      409: json(S.ErrorSchema, 'Phone taken'),
+    },
+  });
+  path({
+    method: 'post',
+    path: '/api/users/{id}/reset-password',
+    tags: ['Users'],
+    summary: 'New temporary password for a staff account (admin)',
+    security: secured,
+    request: { params: S.IdParamsSchema },
+    responses: {
+      200: json(S.TemporaryLoginSchema, 'Temporary password (shown once)'),
+      ...errors,
+      404: json(S.ErrorSchema, 'Not found'),
+    },
   });
   path({
     method: 'patch',
@@ -122,6 +181,15 @@ export function buildOpenApiDocument() {
     request: body(S.CreateVillageBodySchema),
     responses: { 201: json(S.VillageSchema, 'Created'), ...errors },
   });
+  path({
+    method: 'patch',
+    path: '/api/villages/{id}',
+    tags: ['Villages'],
+    summary: 'Edit a village (admin)',
+    security: secured,
+    request: { params: S.IdParamsSchema, ...body(S.UpdateVillageBodySchema) },
+    responses: { 200: json(S.VillageSchema, 'Updated'), ...errors, 404: json(S.ErrorSchema, 'Not found') },
+  });
 
   // ── Patients ──
   path({
@@ -137,10 +205,31 @@ export function buildOpenApiDocument() {
     method: 'post',
     path: '/api/patients',
     tags: ['Patients'],
-    summary: 'Register a patient (health worker, admin)',
+    summary: 'Register a patient (health worker: own villages; admin)',
+    description:
+      'With `createLogin`, also creates a patient login (role fixed to patient) and returns a temporary ' +
+      'password once. `409 DUPLICATE_PHONE` warns that another patient has this phone (repeat with ' +
+      '`allowDuplicatePhone: true` to register anyway); `409 PHONE_TAKEN` if a login already uses it.',
     security: secured,
     request: body(S.CreatePatientBodySchema),
-    responses: { 201: json(S.PatientSchema, 'Created'), ...errors },
+    responses: {
+      201: json(S.CreatedPatientSchema, 'Created'),
+      ...errors,
+      409: json(S.ErrorSchema, 'DUPLICATE_PHONE or PHONE_TAKEN'),
+    },
+  });
+  path({
+    method: 'post',
+    path: '/api/patients/{id}/reset-password',
+    tags: ['Patients'],
+    summary: "New temporary password for a patient's login (health worker: own villages; admin)",
+    security: secured,
+    request: { params: S.IdParamsSchema },
+    responses: {
+      200: json(S.TemporaryLoginSchema, 'Temporary password (shown once)'),
+      ...errors,
+      404: json(S.ErrorSchema, 'Not found'),
+    },
   });
   path({
     method: 'get',
@@ -184,6 +273,33 @@ export function buildOpenApiDocument() {
     security: secured,
     request: body(S.SyncBodySchema),
     responses: { 200: json(S.SyncResponseSchema, 'Per-session results'), ...errors },
+  });
+  path({
+    method: 'post',
+    path: '/api/triage/guest-claims',
+    tags: ['Triage'],
+    summary: 'Add guest checks made on this phone to my record (patient)',
+    description:
+      'Same processing as `/api/triage/sync` (re-evaluated, idempotent per clientId), for the ' +
+      "caller's own patient record; sessions are stored with `origin: guest`.",
+    security: secured,
+    request: body(S.GuestClaimBodySchema),
+    responses: { 200: json(S.SyncResponseSchema, 'Per-session results'), ...errors },
+  });
+  path({
+    method: 'post',
+    path: '/api/guest/triage',
+    tags: ['Triage'],
+    summary: 'Triage without an account (public, rate-limited, stores nothing)',
+    description:
+      'Same red-flag rules, safety floors and model as `/api/triage`. Nothing is stored on the server; ' +
+      'the result is kept only on the device.',
+    request: body(S.GuestTriageBodySchema),
+    responses: {
+      200: json(S.GuestTriageResponseSchema, 'Result (not stored)'),
+      400: errors[400],
+      429: json(S.ErrorSchema, 'Too many requests'),
+    },
   });
   path({
     method: 'get',

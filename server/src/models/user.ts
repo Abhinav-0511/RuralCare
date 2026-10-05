@@ -18,6 +18,8 @@ const userSchema = new Schema(
     patientId: { type: Schema.Types.ObjectId, ref: 'Patient' },
     preferredLanguage: { type: String, enum: LOCALES, default: 'en' },
     isActive: { type: Boolean, default: true },
+    /** Set for temporary passwords (created by a health worker or admin): must be changed at next login. */
+    mustChangePassword: { type: Boolean, default: false },
     /** Incremented on logout/deactivation to revoke all issued tokens. */
     tokenVersion: { type: Number, default: 0 },
   },

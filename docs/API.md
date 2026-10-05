@@ -5,30 +5,122 @@ The OpenAPI 3.1 spec is generated from the same Zod schemas that validate reques
 - **Swagger UI:** http://localhost:4000/api/docs
 - **Raw spec:** http://localhost:4000/api/openapi.json
 
-All endpoints except `/health`, `GET /api/villages`, register, login and refresh need `Authorization: Bearer <accessToken>`.
+All endpoints except `/health`, `GET /api/villages`, login, refresh, the password-reset pair and `POST /api/guest/triage` need `Authorization: Bearer <accessToken>`. **No public endpoint creates an account.**
 
 ## Endpoints and roles
 
-| Method         | Path                                                      |              patient              | health_worker | doctor | admin |
-| -------------- | --------------------------------------------------------- | :-------------------------------: | :-----------: | :----: | :---: |
-| POST           | `/api/auth/register`                                      | public: creates a patient account |               |        |       |
-| POST           | `/api/auth/login`, `/api/auth/refresh`                    |              public               |               |        |       |
-| POST           | `/api/auth/logout` · GET `/api/auth/me`                   |                 ✓                 |       ✓       |   ✓    |   ✓   |
-| GET            | `/api/villages`                                           |              public               |               |        |       |
-| POST           | `/api/villages`                                           |                                   |               |        |   ✓   |
-| GET/POST/PATCH | `/api/users`                                              |                                   |               |        |   ✓   |
-| GET            | `/api/patients`                                           |                                   | own villages  |   ✓    |   ✓   |
-| POST           | `/api/patients`                                           |                                   | own villages  |        |   ✓   |
-| GET            | `/api/patients/:id`                                       |               self                | own villages  |   ✓    |   ✓   |
-| POST           | `/api/triage`                                             |               self                | own villages  |   ✓    |   ✓   |
-| POST           | `/api/triage/sync`                                        |               self                | own villages  |   ✓    |   ✓   |
-| GET            | `/api/triage`, `/api/triage/:id`                          |               self                | own villages  |   ✓    |   ✓   |
-| POST           | `/api/triage/:id/notes`, `/api/triage/:id/review`         |                                   |               |   ✓    |       |
-| GET            | `/api/dashboard/stats`                                    |                                   | own villages  |   ✓    |   ✓   |
-| GET            | `/api/vitals/:patientId`, `/api/vitals/:patientId/latest` |               self                | own villages  |   ✓    |   ✓   |
-| GET            | `/api/alerts`                                             |               self                | own villages  |   ✓    |   ✓   |
-| PATCH          | `/api/alerts/:id` (acknowledge)                           |                                   | own villages  |   ✓    |       |
-| GET            | `/api/model/version`                                      |              public               |               |        |       |
+| Method         | Path                                                      |               patient                | health_worker | doctor | admin |
+| -------------- | --------------------------------------------------------- | :----------------------------------: | :-----------: | :----: | :---: |
+| POST           | `/api/auth/register`                                      |   disabled: `410`, creates nothing   |               |        |       |
+| POST           | `/api/auth/password-reset/request`, `/confirm`            |         public, rate-limited         |               |        |       |
+| POST           | `/api/guest/triage`                                       | public, rate-limited, stores nothing |               |        |       |
+| POST           | `/api/auth/login`, `/api/auth/refresh`                    |                public                |               |        |       |
+| POST           | `/api/auth/logout` · GET `/api/auth/me`                   |                  ✓                   |       ✓       |   ✓    |   ✓   |
+| POST           | `/api/auth/change-password`                               |                  ✓                   |       ✓       |   ✓    |   ✓   |
+| GET            | `/api/villages`                                           |                public                |               |        |       |
+| POST · PATCH   | `/api/villages`, `/api/villages/:id`                      |                                      |               |        |   ✓   |
+| GET/POST/PATCH | `/api/users`                                              |                                      |               |        |   ✓   |
+| POST           | `/api/users/:id/reset-password` (staff)                   |                                      |               |        |   ✓   |
+| GET            | `/api/patients`                                           |                                      | own villages  |   ✓    |   ✓   |
+| POST           | `/api/patients`                                           |                                      | own villages  |        |   ✓   |
+| POST           | `/api/patients/:id/reset-password`                        |                                      | own villages  |        |   ✓   |
+| GET            | `/api/patients/:id`                                       |                 self                 | own villages  |   ✓    |   ✓   |
+| POST           | `/api/triage`                                             |                 self                 | own villages  |   ✓    |   ✓   |
+| POST           | `/api/triage/sync`                                        |                 self                 | own villages  |   ✓    |   ✓   |
+| POST           | `/api/triage/guest-claims`                                |                 self                 |               |        |       |
+| GET            | `/api/triage`, `/api/triage/:id`                          |                 self                 | own villages  |   ✓    |   ✓   |
+| POST           | `/api/triage/:id/notes`, `/api/triage/:id/review`         |                                      |               |   ✓    |       |
+| GET            | `/api/dashboard/stats`                                    |                                      | own villages  |   ✓    |   ✓   |
+| GET            | `/api/vitals/:patientId`, `/api/vitals/:patientId/latest` |                 self                 | own villages  |   ✓    |   ✓   |
+| GET            | `/api/alerts`                                             |                 self                 | own villages  |   ✓    |   ✓   |
+| PATCH          | `/api/alerts/:id` (acknowledge)                           |                                      | own villages  |   ✓    |       |
+| GET            | `/api/model/version`                                      |                public                |               |        |       |
+
+## Onboarding and accounts
+
+There is no self sign-up. Patient logins are created by a health worker, staff logins by an admin, and a role can only ever be set by an admin (`/api/users`). `POST /api/auth/register` answers `410 SELF_REGISTRATION_DISABLED`.
+
+### Temporary passwords
+
+A login created by a health worker or admin without a password gets a **temporary password**, returned **once** in the response (stored only as a bcrypt hash). The user then has `mustChangePassword: true`, and every authenticated endpoint except `GET /api/auth/me`, `POST /api/auth/logout` and `POST /api/auth/change-password` answers `403 PASSWORD_CHANGE_REQUIRED`.
+
+```jsonc
+// POST /api/auth/change-password   (Bearer token of the temporary session)
+{ "currentPassword": "Hk7mQ2pZx9", "newPassword": "my-own-secret" }
+// 200 → { "user": { …, "mustChangePassword": false }, "tokens": { … } }   other sessions are revoked
+```
+
+### Health worker: register a patient (`POST /api/patients`)
+
+New optional fields (existing requests keep working): `createLogin`, `preferredLanguage`, `allowDuplicatePhone`.
+
+```jsonc
+// request (health worker; villageId must be one of their villages, otherwise 403)
+{ "name": "Kaveri N", "sex": "female", "dateOfBirth": "1995-03-10", "villageId": "…",
+  "phone": "9876543210", "createLogin": true, "preferredLanguage": "ta" }
+// 201 → the patient, plus (only with createLogin):
+{ "userId": "…", "login": { "phone": "9876543210", "temporaryPassword": "Hk7mQ2pZx9" } }
+```
+
+| Error                  | When                                                                                                             |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `409 DUPLICATE_PHONE`  | Another patient has this phone. A warning: repeat with `allowDuplicatePhone: true` (e.g. a shared family phone). |
+| `409 PHONE_TAKEN`      | `createLogin` with a phone that already has a login.                                                             |
+| `400 VALIDATION_ERROR` | `createLogin` without a phone.                                                                                   |
+
+The login's role is always `patient`; any `role` in the body is ignored. `POST /api/patients/:id/reset-password` (health worker of that village, or admin) returns `{ phone, temporaryPassword }`, sets `mustChangePassword` and signs the patient out everywhere (`400 NO_LOGIN` if the patient has no login).
+
+### Admin
+
+- `POST /api/users`: `password` is now optional. Without it a temporary password is generated and returned once as `temporaryPassword`.
+- `PATCH /api/users/:id` also accepts `preferredLanguage`. Changing the role or deactivating revokes the user's tokens (as before).
+- `POST /api/users/:id/reset-password`: staff only (`400 USE_PATIENT_RESET` for patients).
+- `PATCH /api/villages/:id`: `name`, `district`, `state`, `location`.
+
+### Forgot password (SMS code)
+
+```jsonc
+// 1. POST /api/auth/password-reset/request   { "phone": "9000000021" }
+// 202, identical for every phone number, whether or not it has an account:
+{
+  "message": "If this number has an account, a code has been sent to it.",
+  "expiresInSeconds": 300,
+  "devOtp": "482913",
+} // only with OTP_DEV_ECHO (development); present for unknown numbers too
+// 2. POST /api/auth/password-reset/confirm   { "phone": "9000000021", "otp": "482913", "newPassword": "…" }
+// 200 → { "message": "Password changed. …" }   all sessions of the user are revoked
+```
+
+| Rule                    | Default                                                                                  |
+| ----------------------- | ---------------------------------------------------------------------------------------- |
+| Code                    | 6 digits, stored only as an HMAC, single use; a new request replaces the previous code   |
+| Expiry                  | `OTP_TTL_SECONDS` = 300                                                                  |
+| Wrong attempts per code | `OTP_MAX_ATTEMPTS` = 5, then the code no longer works                                    |
+| Requests per phone      | `OTP_REQUESTS_PER_PHONE_PER_HOUR` = 3 (`429`), counted for unknown numbers too           |
+| Requests per IP         | `AUTH_RATE_LIMIT_PER_15MIN` = 20 across both endpoints (`429`, `Retry-After`)            |
+| Errors                  | Wrong, expired, used, out-of-attempts and unknown-phone codes all give `400 INVALID_OTP` |
+
+SMS goes through `SmsSender` (`server/src/services/sms.ts`). The only provider is `SMS_PROVIDER=console`, which logs the message with a masked phone number. A real gateway implements the same one-method interface. The send is not awaited, so a slow gateway can't make answers for real accounts measurably slower.
+
+### Guest triage (`POST /api/guest/triage`, public)
+
+```jsonc
+// request: same input as POST /api/triage (age required)
+{ "input": { "symptoms": ["chest_pain"], "ageMonths": 360, "sex": "female" } }
+// 200
+{ "result": { "level": "EMERGENCY", "source": "rule_engine", "redFlags": ["…"], … },
+  "guidance": { … }, "stored": false }
+```
+
+Same rules, safety floors, model and fallback as `/api/triage`, but **nothing is written** to any database (a test compares every collection before and after) and the response has `Cache-Control: no-store`. Rate limit: `GUEST_TRIAGE_RATE_LIMIT_PER_10MIN` = 30 per IP. The PWA falls back to on-device triage on `429`, `5xx` or no network, so a guest always gets an answer.
+
+### Adding guest checks to a record (`POST /api/triage/guest-claims`, patient)
+
+Body: `{ "sessions": [ { clientId, clientCreatedAt, input, clientResult? } ] }`, like a sync item without `patientId` (the caller's own record is always used). Each check is re-evaluated exactly like `/api/triage/sync`, stored with **`origin: "guest"`**, and idempotent per `clientId`. The response has the same shape as `/api/triage/sync`.
+
+### Rate limits
+
+The limits are in memory, per server process. That is enough for one instance; several replicas (Phase 6) need a shared store such as Redis.
 
 ## Triage input (Phase 5 fields)
 
@@ -187,4 +279,4 @@ The server proxies this from the AI service. The PWA compares `sha256` with its 
 }
 ```
 
-Common codes: `VALIDATION_ERROR`, `INVALID_JSON`, `INVALID_ID`, `UNAUTHORIZED`, `INVALID_CREDENTIALS`, `FORBIDDEN`, `NOT_FOUND`, `PHONE_TAKEN`, `UNKNOWN_VILLAGE`, `UNKNOWN_SYMPTOMS`, `PATIENT_REQUIRED`, `CLIENT_ID_CONFLICT`, `ALREADY_REVIEWED`, `INVALID_RANGE`, `RANGE_TOO_LARGE`, `TOO_MANY_POINTS`, `VITALS_UNAVAILABLE`, `ALREADY_ACKNOWLEDGED`, `MODEL_UNAVAILABLE`.
+Common codes: `VALIDATION_ERROR`, `INVALID_JSON`, `INVALID_ID`, `UNAUTHORIZED`, `INVALID_CREDENTIALS`, `FORBIDDEN`, `NOT_FOUND`, `PHONE_TAKEN`, `UNKNOWN_VILLAGE`, `UNKNOWN_SYMPTOMS`, `PATIENT_REQUIRED`, `CLIENT_ID_CONFLICT`, `ALREADY_REVIEWED`, `INVALID_RANGE`, `RANGE_TOO_LARGE`, `TOO_MANY_POINTS`, `VITALS_UNAVAILABLE`, `ALREADY_ACKNOWLEDGED`, `MODEL_UNAVAILABLE`, `SELF_REGISTRATION_DISABLED`, `PASSWORD_CHANGE_REQUIRED`, `DUPLICATE_PHONE`, `NO_LOGIN`, `USE_PATIENT_RESET`, `INVALID_OTP`, `RATE_LIMITED`.

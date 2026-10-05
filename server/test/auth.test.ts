@@ -22,52 +22,26 @@ const registration = () => ({
   preferredLanguage: 'ta',
 });
 
-describe('POST /api/auth/register', () => {
-  it('creates a patient account linked to a patient record and returns tokens', async () => {
+// Self-registration was disabled with onboarding: patients are registered by health workers.
+describe('POST /api/auth/register (disabled)', () => {
+  it('answers 410 and creates no user or patient', async () => {
+    const [users, patients] = await Promise.all([User.countDocuments(), Patient.countDocuments()]);
     const res = await request(app).post('/api/auth/register').send(registration());
 
-    expect(res.status).toBe(201);
-    expect(res.body.user).toMatchObject({ role: 'patient', phone: '9876543210', preferredLanguage: 'ta' });
-    expect(res.body.user.passwordHash).toBeUndefined();
-    expect(res.body.tokens.accessToken).toEqual(expect.any(String));
-
-    const patient = await Patient.findById(res.body.user.patientId);
-    expect(patient).toMatchObject({ name: 'Kaveri Natarajan', sex: 'female' });
-    expect(String(patient!.userId)).toBe(res.body.user.id);
-
-    const me = await request(app)
-      .get('/api/auth/me')
-      .set('Authorization', `Bearer ${res.body.tokens.accessToken}`);
-    expect(me.status).toBe(200);
-    expect(me.body.id).toBe(res.body.user.id);
+    expect(res.status).toBe(410);
+    expect(res.body.error.code).toBe('SELF_REGISTRATION_DISABLED');
+    expect(res.body.tokens).toBeUndefined();
+    expect(await User.countDocuments()).toBe(users);
+    expect(await Patient.countDocuments()).toBe(patients);
+    expect(await User.exists({ phone: '9876543210' })).toBeNull();
   });
 
-  it('rejects a phone number that is already registered', async () => {
-    await request(app).post('/api/auth/register').send(registration()).expect(201);
-    const res = await request(app).post('/api/auth/register').send(registration());
-    expect(res.status).toBe(409);
-    expect(res.body.error.code).toBe('PHONE_TAKEN');
-  });
-
-  it('rejects an unknown village', async () => {
+  it('cannot be used to create staff or admin accounts either', async () => {
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ ...registration(), villageId: '665f1c2e8b3e4a0012345678' });
-    expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe('UNKNOWN_VILLAGE');
-  });
-
-  it('validates phone, password and date of birth', async () => {
-    const res = await request(app)
-      .post('/api/auth/register')
-      .send({ ...registration(), phone: '12345', password: 'short', dateOfBirth: '2999-01-01' });
-    expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe('VALIDATION_ERROR');
-    expect(res.body.error.details.map((d: { path: string }) => d.path).sort()).toEqual([
-      'dateOfBirth',
-      'password',
-      'phone',
-    ]);
+      .send({ ...registration(), role: 'admin', villageIds: [world.villages.v1.id] });
+    expect(res.status).toBe(410);
+    expect(await User.exists({ phone: '9876543210' })).toBeNull();
   });
 });
 

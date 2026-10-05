@@ -1,6 +1,6 @@
 import type { LocalizedText, TriageLevelId } from '@ruralcare/shared';
 import { useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { Button, Card, ErrorBox, formatDateTime, LevelBadge, Spinner } from '../components/ui';
 import { useI18n } from '../i18n/I18nProvider';
 import { api } from '../lib/api';
@@ -33,6 +33,8 @@ export default function HealthWorkerPage() {
   const alerts = useApi<{ items: AlertDto[] }>(online ? '/api/alerts?acknowledged=false&limit=50' : null);
   const recent = useApi<{ items: SessionDto[] }>(online ? '/api/triage?limit=10' : null);
   const [ackError, setAckError] = useState<string | null>(null);
+  const [params] = useSearchParams();
+  const registered = params.get('registered');
 
   const acknowledge = async (id: string) => {
     try {
@@ -45,6 +47,20 @@ export default function HealthWorkerPage() {
 
   return (
     <div className="space-y-4">
+      {registered && (
+        <p
+          role="status"
+          data-testid="registered-banner"
+          className="rounded-xl bg-emerald-50 p-3 text-emerald-900"
+        >
+          ✓ {t('reg.done', { name: registered })}
+        </p>
+      )}
+      <Link to="/hw/register" className="block">
+        <Button className="w-full" data-testid="register-patient-button" disabled={!online}>
+          ➕ {t('hw.register')}
+        </Button>
+      </Link>
       <Card>
         <h2 className="mb-2 text-lg font-bold">🚨 {t('hw.alerts')}</h2>
         {!online && <p className="text-slate-600">{t('common.needsInternet')}</p>}
