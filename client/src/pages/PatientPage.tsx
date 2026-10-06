@@ -1,4 +1,4 @@
-import { type AlertVital, thresholdsFor, type TriageLevelId } from '@ruralcare/shared';
+import { type AlertVital, LOCALES, thresholdsFor, type TriageLevelId } from '@ruralcare/shared';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import {
@@ -13,9 +13,9 @@ import {
 } from 'recharts';
 import { TempPasswordCard } from '../components/TempPasswordCard';
 import { Button, Card, ErrorBox, formatDateTime, LevelBadge, Spinner } from '../components/ui';
-import { useI18n } from '../i18n/I18nProvider';
+import { LOCALE_NAMES, useI18n } from '../i18n/I18nProvider';
 import type { StringKey } from '../i18n/strings';
-import { api } from '../lib/api';
+import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useOnline } from '../lib/connectivity';
 import { useApi } from '../lib/hooks';
@@ -38,9 +38,11 @@ interface PatientDto {
 }
 
 /** Health worker / admin: a patient's login, with a password reset (new temporary password). */
-function LoginCard({ patient }: { patient: PatientDto }) {
+function LoginCard({ patient, onChanged }: { patient: PatientDto; onChanged: () => void }) {
   const { t } = useI18n();
   const [confirming, setConfirming] = useState(false);
+  const [phone, setPhone] = useState('');
+  const [language, setLanguage] = useState<(typeof LOCALES)[number]>('ta');
   const [temp, setTemp] = useState<{ phone: string; temporaryPassword: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,15 +56,83 @@ function LoginCard({ patient }: { patient: PatientDto }) {
     }
   };
 
+  /** Login for a patient registered without one: same temporary-password flow as registration. */
+  const createLogin = async () => {
+    setError(null);
+    try {
+      setTemp(
+        await api(`/api/patients/${patient.id}/login`, {
+          method: 'POST',
+          body: { preferredLanguage: language, ...(patient.phone ? {} : { phone: phone.trim() }) },
+        }),
+      );
+    } catch (err) {
+      setError(
+        err instanceof ApiError && err.code === 'PHONE_TAKEN'
+          ? t('reg.phoneTaken')
+          : err instanceof ApiError && (err.code === 'VALIDATION_ERROR' || err.code === 'PHONE_REQUIRED')
+            ? t('common.phoneInvalid')
+            : (err as Error).message,
+      );
+    }
+  };
+
   if (temp)
     return (
-      <TempPasswordCard phone={temp.phone} password={temp.temporaryPassword} onDone={() => setTemp(null)} />
+      <TempPasswordCard
+        phone={temp.phone}
+        password={temp.temporaryPassword}
+        onDone={() => {
+          setTemp(null);
+          onChanged();
+        }}
+      />
     );
   return (
     <Card>
       <h2 className="mb-2 font-semibold">{t('patient.login')}</h2>
       {!patient.userId ? (
-        <p className="text-slate-600">{t('patient.noLogin')}</p>
+        <div className="space-y-3" data-testid="create-login">
+          <p className="text-slate-600">{t('patient.noLogin')}</p>
+          {patient.phone ? (
+            <p className="font-mono">{patient.phone}</p>
+          ) : (
+            <label className="block">
+              <span className="mb-1 block font-medium">{t('login.phone')}</span>
+              <input
+                name="loginPhone"
+                type="tel"
+                inputMode="numeric"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="min-h-12 w-full rounded-xl border border-slate-300 px-3 text-lg"
+              />
+            </label>
+          )}
+          <label className="block">
+            <span className="mb-1 block font-medium">{t('reg.language')}</span>
+            <select
+              name="loginLanguage"
+              value={language}
+              onChange={(e) => setLanguage(e.target.value as (typeof LOCALES)[number])}
+              className="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-lg"
+            >
+              {LOCALES.map((l) => (
+                <option key={l} value={l}>
+                  {LOCALE_NAMES[l]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <Button
+            onClick={() => void createLogin()}
+            disabled={!patient.phone && !phone.trim()}
+            data-testid="create-login-button"
+          >
+            🔑 {t('patient.createLogin')}
+          </Button>
+          {error && <ErrorBox>{error}</ErrorBox>}
+        </div>
       ) : (
         <div className="space-y-2">
           <p className="font-mono">{patient.phone}</p>
@@ -141,7 +211,9 @@ export default function PatientPage() {
         <p className="text-slate-600">{t('patient.years', { n: Math.floor(patient.data.ageMonths / 12) })}</p>
       </div>
 
-      {(user?.role === 'health_worker' || user?.role === 'admin') && <LoginCard patient={patient.data} />}
+      {(user?.role === 'health_worker' || user?.role === 'admin') && (
+        <LoginCard patient={patient.data} onChanged={patient.reload} />
+      )}
 
       <Card>
         <h2 className="mb-2 font-semibold">{t('patient.vitals')}</h2>

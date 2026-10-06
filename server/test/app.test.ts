@@ -77,6 +77,7 @@ describe('API docs', () => {
       '/api/model/version',
       '/api/patients',
       '/api/patients/{id}',
+      '/api/patients/{id}/login',
       '/api/patients/{id}/reset-password',
       '/api/triage',
       '/api/triage/guest-claims',

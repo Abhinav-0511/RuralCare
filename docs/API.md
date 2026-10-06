@@ -17,12 +17,13 @@ All endpoints except `/health`, `GET /api/villages`, login, refresh, the passwor
 | POST           | `/api/auth/login`, `/api/auth/refresh`                    |                public                |               |        |       |
 | POST           | `/api/auth/logout` · GET `/api/auth/me`                   |                  ✓                   |       ✓       |   ✓    |   ✓   |
 | POST           | `/api/auth/change-password`                               |                  ✓                   |       ✓       |   ✓    |   ✓   |
-| GET            | `/api/villages`                                           |                public                |               |        |       |
+| GET            | `/api/villages` (`?active=true`: only active)             |                public                |               |        |       |
 | POST · PATCH   | `/api/villages`, `/api/villages/:id`                      |                                      |               |        |   ✓   |
 | GET/POST/PATCH | `/api/users`                                              |                                      |               |        |   ✓   |
 | POST           | `/api/users/:id/reset-password` (staff)                   |                                      |               |        |   ✓   |
 | GET            | `/api/patients`                                           |                                      | own villages  |   ✓    |   ✓   |
 | POST           | `/api/patients`                                           |                                      | own villages  |        |   ✓   |
+| POST           | `/api/patients/:id/login` (login for an existing patient) |                                      | own villages  |        |   ✓   |
 | POST           | `/api/patients/:id/reset-password`                        |                                      | own villages  |        |   ✓   |
 | GET            | `/api/patients/:id`                                       |                 self                 | own villages  |   ✓    |   ✓   |
 | POST           | `/api/triage`                                             |                 self                 | own villages  |   ✓    |   ✓   |
@@ -68,6 +69,8 @@ New optional fields (existing requests keep working): `createLogin`, `preferredL
 | `409 PHONE_TAKEN`      | `createLogin` with a phone that already has a login.                                                             |
 | `400 VALIDATION_ERROR` | `createLogin` without a phone.                                                                                   |
 
+**A login for a patient registered earlier without one:** `POST /api/patients/:id/login` (health worker of that village, or admin), body `{ "phone"?: "…", "preferredLanguage"?: "ta" }`. It uses the phone on the record, or saves `phone` on the record if it has none. It returns `201 { phone, temporaryPassword }` with the same rules as registration (shown once, must be changed at first login). Errors: `409 LOGIN_EXISTS` (reset the password instead), `409 PHONE_TAKEN`, `400 PHONE_REQUIRED`, `400 PHONE_MISMATCH` (a different phone than the record's).
+
 The login's role is always `patient`; any `role` in the body is ignored. `POST /api/patients/:id/reset-password` (health worker of that village, or admin) returns `{ phone, temporaryPassword }`, sets `mustChangePassword` and signs the patient out everywhere (`400 NO_LOGIN` if the patient has no login).
 
 ### Admin
@@ -75,7 +78,17 @@ The login's role is always `patient`; any `role` in the body is ignored. `POST /
 - `POST /api/users`: `password` is now optional. Without it a temporary password is generated and returned once as `temporaryPassword`.
 - `PATCH /api/users/:id` also accepts `preferredLanguage`. Changing the role or deactivating revokes the user's tokens (as before).
 - `POST /api/users/:id/reset-password`: staff only (`400 USE_PATIENT_RESET` for patients).
-- `PATCH /api/villages/:id`: `name`, `district`, `state`, `location`.
+- `PATCH /api/villages/:id`: `name`, `district`, `state`, `location`, `isActive`.
+
+### Deactivating a village (instead of deleting it)
+
+`PATCH /api/villages/:id { "isActive": false }` (admin). A deactivated village:
+
+- is refused for new patients (`400 VILLAGE_INACTIVE` on `POST /api/patients`) and for new staff assignments (`400 VILLAGE_INACTIVE` on `/api/users`, including reactivating a staff member who is assigned to it);
+- keeps its patients, sessions, alerts and vitals, which stay visible and usable;
+- is still listed by `GET /api/villages` (with `isActive: false`); `GET /api/villages?active=true` leaves it out (used by the registration form).
+
+Deactivation is refused with `409 VILLAGE_HAS_STAFF` while **active** staff are assigned. The message names them, and `error.details.staff` lists `{ id, name }`. Move them to another village (or deactivate them) first. `{ "isActive": true }` reactivates. Villages created before this field existed count as active.
 
 ### Forgot password (SMS code)
 
@@ -279,4 +292,4 @@ The server proxies this from the AI service. The PWA compares `sha256` with its 
 }
 ```
 
-Common codes: `VALIDATION_ERROR`, `INVALID_JSON`, `INVALID_ID`, `UNAUTHORIZED`, `INVALID_CREDENTIALS`, `FORBIDDEN`, `NOT_FOUND`, `PHONE_TAKEN`, `UNKNOWN_VILLAGE`, `UNKNOWN_SYMPTOMS`, `PATIENT_REQUIRED`, `CLIENT_ID_CONFLICT`, `ALREADY_REVIEWED`, `INVALID_RANGE`, `RANGE_TOO_LARGE`, `TOO_MANY_POINTS`, `VITALS_UNAVAILABLE`, `ALREADY_ACKNOWLEDGED`, `MODEL_UNAVAILABLE`, `SELF_REGISTRATION_DISABLED`, `PASSWORD_CHANGE_REQUIRED`, `DUPLICATE_PHONE`, `NO_LOGIN`, `USE_PATIENT_RESET`, `INVALID_OTP`, `RATE_LIMITED`.
+Common codes: `VALIDATION_ERROR`, `INVALID_JSON`, `INVALID_ID`, `UNAUTHORIZED`, `INVALID_CREDENTIALS`, `FORBIDDEN`, `NOT_FOUND`, `PHONE_TAKEN`, `UNKNOWN_VILLAGE`, `UNKNOWN_SYMPTOMS`, `PATIENT_REQUIRED`, `CLIENT_ID_CONFLICT`, `ALREADY_REVIEWED`, `INVALID_RANGE`, `RANGE_TOO_LARGE`, `TOO_MANY_POINTS`, `VITALS_UNAVAILABLE`, `ALREADY_ACKNOWLEDGED`, `MODEL_UNAVAILABLE`, `SELF_REGISTRATION_DISABLED`, `PASSWORD_CHANGE_REQUIRED`, `DUPLICATE_PHONE`, `NO_LOGIN`, `USE_PATIENT_RESET`, `INVALID_OTP`, `RATE_LIMITED`, `LOGIN_EXISTS`, `PHONE_REQUIRED`, `PHONE_MISMATCH`, `VILLAGE_INACTIVE`, `VILLAGE_HAS_STAFF`.

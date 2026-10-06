@@ -59,7 +59,7 @@ symptoms ──► RED-FLAG RULE ENGINE ──(red flag hit)──► EMERGENCY 
 There is **no self sign-up**. Accounts come from people the user already knows:
 
 1. **Anyone, no account:** on the login screen, tap **"Check symptoms without an account"**. The full triage works, including offline, with the same safety rules and the Call 108 button. The result is kept only on that phone.
-2. **Becoming a patient:** the village **health worker** taps **"Register new patient"** (name, mobile, village, sex, date of birth, language) and can tick **"Create a login"**. The app shows a **temporary password once**; the health worker gives it to the patient.
+2. **Becoming a patient:** the village **health worker** taps **"Register new patient"** (name, mobile, village, sex, date of birth, language) and can tick **"Create a login"**. The app shows a **temporary password once**; the health worker gives it to the patient. A patient registered earlier without a login gets one from their patient page (**"Create login"**).
 3. **First login:** the patient logs in with their mobile number and the temporary password, and must **choose their own password**. If they used the app as a guest on that phone, they are asked **"You have N earlier checks on this phone. Add them to your record?"**
 4. **Staff:** an **admin** creates health workers and doctors (Users page), assigns villages, and gets a temporary password to hand over. The same first-login rule applies.
 5. **Forgot password:** "Forgot password?" on the login screen sends a 6-digit code by SMS (mocked: the code is logged by the server and shown in the app in development). Without access to that phone, the health worker (patients) or admin (staff) can reset it.
@@ -114,7 +114,7 @@ docker compose -f infra/docker-compose.yml exec edge-simulator \
 
 The critical alert appears in `GET /api/alerts`. A triage for that patient in the next 30 minutes becomes EMERGENCY (`RF_LOW_OXYGEN`), even after normal readings resume.
 
-**Demo logins.** Every account uses the password `RuralCare@123`. The seed (and therefore the e2e suite's setup) wipes existing data. **Forgot-password codes** appear in the server log (`docker compose -f infra/docker-compose.yml logs server`) and, in development, on screen.
+**Demo logins.** Every account uses the password `RuralCare@123`. The seed (and therefore the e2e suite's setup) wipes existing data; the e2e setup also deletes the vitals of patients that no longer exist. **Forgot-password codes** appear in the server log (`docker compose -f infra/docker-compose.yml logs server`) and, in development, on screen.
 
 | Role          | Phone                                                                                                                |
 | ------------- | -------------------------------------------------------------------------------------------------------------------- |
@@ -158,6 +158,14 @@ python -m venv .venv
 .venv/Scripts/python -m pytest
 .venv/Scripts/ruff check . && .venv/Scripts/ruff format --check .
 .venv/Scripts/uvicorn app.main:app --reload           # http://localhost:8000/docs
+```
+
+**Orphaned vitals.** Re-seeding replaces every patient, so earlier device readings in TimescaleDB can point at patient ids that no longer exist. This re-runnable script lists them (dry run) and deletes them only with `--apply`, then refreshes the hourly aggregate. It refuses to run if MongoDB has no patients at all (most likely the wrong database).
+
+```bash
+docker compose -f infra/docker-compose.yml exec server node server/dist/cleanupOrphanVitals.js           # dry run: count
+docker compose -f infra/docker-compose.yml exec server node server/dist/cleanupOrphanVitals.js --apply   # delete
+npm run vitals:cleanup -w @ruralcare/server [-- --apply]                                                  # local
 ```
 
 **End-to-end tests (Playwright).** They drive the Docker stack on a 360 px phone viewport and re-seed the database first. Coverage is listed in [docs/PWA.md](docs/PWA.md#6-end-to-end-tests).

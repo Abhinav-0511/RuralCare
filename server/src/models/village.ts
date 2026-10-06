@@ -9,6 +9,11 @@ const villageSchema = new Schema(
       lat: { type: Number, min: -90, max: 90 },
       lng: { type: Number, min: -180, max: 180 },
     },
+    /**
+     * Deactivated villages are hidden from new registrations and staff assignment. Their patients,
+     * sessions and vitals are kept. Older documents have no field and count as active.
+     */
+    isActive: { type: Boolean, default: true },
   },
   {
     timestamps: true,

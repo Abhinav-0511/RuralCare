@@ -12,6 +12,8 @@ interface Village {
   id: string;
   name: string;
   district: string;
+  /** Missing on villages created before deactivation existed: active. */
+  isActive?: boolean;
 }
 type StaffRole = 'health_worker' | 'doctor' | 'admin';
 const STAFF_ROLES: StaffRole[] = ['health_worker', 'doctor', 'admin'];
@@ -26,21 +28,23 @@ function VillagePicker(props: { villages: Village[]; value: string[]; onChange: 
     <fieldset>
       <legend className={label}>{t('admin.assignVillages')}</legend>
       <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-        {props.villages.map((v) => (
-          <label key={v.id} className="flex min-h-12 items-center gap-3 rounded-lg px-1">
-            <input
-              type="checkbox"
-              className="h-6 w-6"
-              checked={props.value.includes(v.id)}
-              onChange={(e) =>
-                props.onChange(
-                  e.target.checked ? [...props.value, v.id] : props.value.filter((x) => x !== v.id),
-                )
-              }
-            />
-            {v.name} <span className="text-sm text-slate-600">({v.district})</span>
-          </label>
-        ))}
+        {props.villages
+          .filter((v) => v.isActive !== false || props.value.includes(v.id))
+          .map((v) => (
+            <label key={v.id} className="flex min-h-12 items-center gap-3 rounded-lg px-1">
+              <input
+                type="checkbox"
+                className="h-6 w-6"
+                checked={props.value.includes(v.id)}
+                onChange={(e) =>
+                  props.onChange(
+                    e.target.checked ? [...props.value, v.id] : props.value.filter((x) => x !== v.id),
+                  )
+                }
+              />
+              {v.name} <span className="text-sm text-slate-600">({v.district})</span>
+            </label>
+          ))}
       </div>
     </fieldset>
   );
@@ -163,6 +167,22 @@ function VillagesCard({ villages, reload }: { villages: Village[]; reload: () =>
     setDistrict(v?.district ?? '');
     setError(null);
   };
+  const setActive = async (v: Village, isActive: boolean) => {
+    setError(null);
+    try {
+      await api(`/api/villages/${v.id}`, { method: 'PATCH', body: { isActive } });
+      reload();
+    } catch (err) {
+      const staff = (err instanceof ApiError && err.code === 'VILLAGE_HAS_STAFF' && err.details) as
+        { staff: { name: string }[] } | false;
+      setError(
+        staff
+          ? t('admin.villageHasStaff', { village: v.name, names: staff.staff.map((x) => x.name).join(', ') })
+          : errorText(err, t),
+      );
+    }
+  };
+
   const save = async (e: FormEvent) => {
     e.preventDefault();
     try {
@@ -227,17 +247,38 @@ function VillagesCard({ villages, reload }: { villages: Village[]; reload: () =>
               {form}
             </li>
           ) : (
-            <li key={v.id} className="flex min-h-14 items-center justify-between gap-2">
-              <span>
+            <li
+              key={v.id}
+              className="flex min-h-14 flex-wrap items-center justify-between gap-2 py-1"
+              data-testid="village-item"
+              data-active={v.isActive !== false}
+            >
+              <span className={v.isActive === false ? 'text-slate-400' : ''}>
                 {v.name} <span className="text-sm text-slate-600">({v.district})</span>
+                {v.isActive === false && (
+                  <span className="ml-2 rounded-full bg-slate-200 px-2 py-0.5 text-xs text-slate-700">
+                    {t('admin.inactive')}
+                  </span>
+                )}
               </span>
-              <Button variant="ghost" onClick={() => open(v)}>
-                {t('admin.edit')}
-              </Button>
+              <span className="flex gap-1">
+                <Button variant="ghost" onClick={() => open(v)}>
+                  {t('admin.edit')}
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => void setActive(v, v.isActive === false)}
+                  data-testid="village-toggle"
+                >
+                  {v.isActive === false ? t('admin.activate') : t('admin.deactivate')}
+                </Button>
+              </span>
             </li>
           ),
         )}
       </ul>
+      {error && !editing && <ErrorBox>{error}</ErrorBox>}
+      <p className="mt-2 text-sm text-slate-600">{t('admin.villageDeactivateHint')}</p>
       {editing === 'new' ? (
         <div className="mt-2">{form}</div>
       ) : (

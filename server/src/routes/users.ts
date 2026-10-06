@@ -13,10 +13,17 @@ import {
   UpdateUserBodySchema,
 } from '../schemas/api';
 
-async function assertVillagesExist(ids: string[] | undefined) {
+/** All villages must exist; newly assigned ones (not in `alreadyAssigned`) must also be active. */
+async function assertVillagesExist(ids: string[] | undefined, alreadyAssigned: string[] = []) {
   if (!ids?.length) return;
-  const found = await Village.countDocuments({ _id: { $in: ids } });
-  if (found !== new Set(ids).size) throw badRequest('UNKNOWN_VILLAGE', 'One or more villages do not exist');
+  const found = await Village.find({ _id: { $in: ids } })
+    .select('isActive')
+    .lean();
+  if (found.length !== new Set(ids).size)
+    throw badRequest('UNKNOWN_VILLAGE', 'One or more villages do not exist');
+  if (found.some((v) => v.isActive === false && !alreadyAssigned.includes(String(v._id)))) {
+    throw badRequest('VILLAGE_INACTIVE', 'This village is deactivated');
+  }
 }
 
 /** Staff account management. Admin only: the only place where a role can be set. */
@@ -60,10 +67,14 @@ export function usersRouter(deps: { env: Pick<Env, 'BCRYPT_ROUNDS'> }) {
     if (id === currentUser(req).id && (body.isActive === false || (body.role && body.role !== 'admin'))) {
       throw badRequest('SELF_LOCKOUT', 'You cannot deactivate yourself or remove your own admin role');
     }
-    await assertVillagesExist(body.villageIds);
-
     const user = await User.findById(id);
     if (!user) throw notFound('User');
+    // An active account may keep a village that was deactivated later, but not gain one,
+    // and an account can't be reactivated into a deactivated village.
+    const current = user.villageIds.map(String);
+    const willBeActive = body.isActive ?? user.isActive;
+    if (willBeActive) await assertVillagesExist(body.villageIds ?? current, user.isActive ? current : []);
+    else await assertVillagesExist(body.villageIds, current.concat(body.villageIds ?? []));
     if (user.role === 'patient' && body.role) {
       throw badRequest('INVALID_ROLE_CHANGE', 'Patient accounts cannot be converted to staff accounts');
     }

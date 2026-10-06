@@ -234,16 +234,16 @@ sequenceDiagram
     P->>DB: move the checks into the patient's history
 ```
 
-| Piece                         | Where                                                                                                                                                        |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Guest triage                  | `server/src/routes/guest.ts` (calls the same `evaluateTriage()`), `client/src/triage/guest.ts`, the wizard with `guest`, `GuestLayout`, `GuestResultPage`    |
-| Guest checks on the phone     | Dexie v2 adds a `guestChecks` table (existing data untouched). It is not the sync outbox, so the sync engine never sends it.                                 |
-| Claiming guest checks         | `POST /api/triage/guest-claims` reuses the sync code path (`syncOne`) with `origin: "guest"`; `GuestClaimPrompt` in the patient layout                       |
-| Registration by health worker | `POST /api/patients` with `createLogin`; `RegisterPatientPage`; reset from the patient page                                                                  |
-| Admin                         | `/api/users` (create without password ⇒ temporary password, reset), `PATCH /api/villages/:id`; `AdminUsersPage`                                              |
-| Temporary passwords           | `User.mustChangePassword`; `authenticate()` refuses everything except change-password, `/me` and logout; the PWA redirects to `/change-password`             |
-| Forgot password               | `POST /api/auth/password-reset/request` and `/confirm`; `PasswordReset` collection (HMAC of the code, TTL index); `SmsSender` interface (console mock today) |
-| Rate limits                   | `server/src/lib/rateLimit.ts`, in memory per process (fixed window per IP); the per-phone OTP limit is counted in MongoDB                                    |
+| Piece                         | Where                                                                                                                                                                                                                              |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Guest triage                  | `server/src/routes/guest.ts` (calls the same `evaluateTriage()`), `client/src/triage/guest.ts`, the wizard with `guest`, `GuestLayout`, `GuestResultPage`                                                                          |
+| Guest checks on the phone     | Dexie v2 adds a `guestChecks` table (existing data untouched). It is not the sync outbox, so the sync engine never sends it.                                                                                                       |
+| Claiming guest checks         | `POST /api/triage/guest-claims` reuses the sync code path (`syncOne`) with `origin: "guest"`; `GuestClaimPrompt` in the patient layout                                                                                             |
+| Registration by health worker | `POST /api/patients` with `createLogin`, or `POST /api/patients/:id/login` for a patient registered without one; `RegisterPatientPage`; create login and reset from the patient page                                               |
+| Admin                         | `/api/users` (create without password ⇒ temporary password, reset), `PATCH /api/villages/:id` (edit, deactivate instead of delete: no new patients or staff, data kept; refused while active staff are assigned); `AdminUsersPage` |
+| Temporary passwords           | `User.mustChangePassword`; `authenticate()` refuses everything except change-password, `/me` and logout; the PWA redirects to `/change-password`                                                                                   |
+| Forgot password               | `POST /api/auth/password-reset/request` and `/confirm`; `PasswordReset` collection (HMAC of the code, TTL index); `SmsSender` interface (console mock today)                                                                       |
+| Rate limits                   | `server/src/lib/rateLimit.ts`, in memory per process (fixed window per IP); the per-phone OTP limit is counted in MongoDB                                                                                                          |
 
 **Compatibility.** Existing users have no `mustChangePassword` field and are treated as `false`, so no migration and no data reset are needed. All response changes are additions (`mustChangePassword`, `login`, `temporaryPassword`). The only removed behaviour is public self-registration, which the app never used.
 

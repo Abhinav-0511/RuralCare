@@ -581,6 +581,17 @@ export const strings = {
   'admin.addVillage': { en: 'Add village', ta: 'கிராமத்தைச் சேர்', hi: 'गाँव जोड़ें' },
   'admin.villageName': { en: 'Village name', ta: 'கிராமத்தின் பெயர்', hi: 'गाँव का नाम' },
   'admin.district': { en: 'District', ta: 'மாவட்டம்', hi: 'ज़िला' },
+  'patient.createLogin': { en: 'Create login', ta: 'உள்நுழைவை உருவாக்கு', hi: 'लॉगिन बनाएँ' },
+  'admin.villageHasStaff': {
+    en: '{village} still has active staff: {names}. Move them to another village or deactivate them first.',
+    ta: '{village} கிராமத்தில் இன்னும் செயலில் உள்ள பணியாளர்கள் உள்ளனர்: {names}. முதலில் அவர்களை வேறு கிராமத்திற்கு மாற்றவும் அல்லது செயலிழக்கச் செய்யவும்.',
+    hi: '{village} में अभी भी सक्रिय स्टाफ़ हैं: {names}। पहले उन्हें दूसरे गाँव में भेजें या निष्क्रिय करें।',
+  },
+  'admin.villageDeactivateHint': {
+    en: 'A deactivated village takes no new patients or staff. Its patients and their history are kept.',
+    ta: 'செயலிழக்கச் செய்யப்பட்ட கிராமத்தில் புதிய நோயாளிகளோ பணியாளர்களோ சேர்க்கப்படமாட்டார்கள். அதன் நோயாளிகளும் அவர்களின் வரலாறும் வைக்கப்படும்.',
+    hi: 'निष्क्रिय गाँव में नए मरीज़ या स्टाफ़ नहीं जोड़े जाते। उसके मरीज़ और उनका इतिहास बना रहता है।',
+  },
   'admin.passwordHint': {
     en: 'A temporary password is created and shown once.',
     ta: 'ஒரு தற்காலிக கடவுச்சொல் உருவாக்கப்பட்டு ஒருமுறை காட்டப்படும்.',

@@ -170,6 +170,7 @@ export function buildOpenApiDocument() {
     path: '/api/villages',
     tags: ['Villages'],
     summary: 'List villages (public)',
+    request: { query: S.ListVillagesQuerySchema },
     responses: { 200: json(z.array(S.VillageSchema), 'Villages') },
   });
   path({
@@ -216,6 +217,23 @@ export function buildOpenApiDocument() {
       201: json(S.CreatedPatientSchema, 'Created'),
       ...errors,
       409: json(S.ErrorSchema, 'DUPLICATE_PHONE or PHONE_TAKEN'),
+    },
+  });
+  path({
+    method: 'post',
+    path: '/api/patients/{id}/login',
+    tags: ['Patients'],
+    summary: 'Create a login for a patient registered without one (health worker: own villages; admin)',
+    description:
+      "Uses the record's phone, or `phone` if the record has none (it is then saved on the record). " +
+      'Returns a temporary password once; it must be changed at first login.',
+    security: secured,
+    request: { params: S.IdParamsSchema, ...body(S.CreatePatientLoginBodySchema) },
+    responses: {
+      201: json(S.TemporaryLoginSchema, 'Login created (temporary password shown once)'),
+      ...errors,
+      404: json(S.ErrorSchema, 'Not found'),
+      409: json(S.ErrorSchema, 'LOGIN_EXISTS or PHONE_TAKEN'),
     },
   });
   path({

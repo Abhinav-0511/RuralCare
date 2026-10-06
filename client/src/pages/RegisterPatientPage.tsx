@@ -28,7 +28,8 @@ export default function RegisterPatientPage() {
   const { user } = useAuth();
   const online = useOnline();
   const navigate = useNavigate();
-  const villages = useApi<Village[]>(online ? '/api/villages' : null);
+  // Deactivated villages take no new registrations.
+  const villages = useApi<Village[]>(online ? '/api/villages?active=true' : null);
   const mine = (villages.data ?? []).filter((v) => user?.role === 'admin' || user?.villageIds.includes(v.id));
 
   const [form, setForm] = useState({

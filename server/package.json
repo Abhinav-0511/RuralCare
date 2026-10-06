@@ -9,6 +9,7 @@
     "start": "node dist/index.js",
     "seed": "tsx --env-file-if-exists=.env src/scripts/seed.ts",
     "devices:provision": "tsx --env-file-if-exists=.env src/scripts/provisionDevices.ts",
+    "vitals:cleanup": "tsx --env-file-if-exists=.env src/scripts/cleanupOrphanVitals.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

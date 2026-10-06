@@ -141,3 +141,29 @@ test('guest triage → health worker registers the patient → patient logs in o
   });
   expect(old.status()).toBe(401);
 });
+
+test('health worker creates a login for an already-registered patient', async ({ page, browser }) => {
+  const phone = `8${String(Date.now()).slice(-9)}`;
+  await login(page, PHONES.hwKelambakkam);
+  await page
+    .getByTestId('patients-list')
+    .getByRole('link', { name: /Senthil Kumar/ })
+    .click();
+  await expect(page.getByTestId('create-login')).toBeVisible();
+  await page.locator('input[name=loginPhone]').fill(phone);
+  await page.getByTestId('create-login-button').click();
+  await expect(page.getByTestId('temp-phone')).toHaveText(phone);
+  const temporaryPassword = (await page.getByTestId('temp-password').textContent())!.trim();
+  await page.getByTestId('temp-done').click();
+  await expect(page.getByTestId('reset-password')).toBeVisible(); // the patient now has a login
+
+  // The patient logs in on their own phone and must choose a password first.
+  const patientContext = await browser.newContext();
+  const patient = await patientContext.newPage();
+  await patient.goto('/login');
+  await patient.locator('input[name=phone]').fill(phone);
+  await patient.locator('input[name=password]').fill(temporaryPassword);
+  await patient.getByRole('button', { name: 'Log in' }).click();
+  await expect(patient).toHaveURL(/\/change-password/);
+  await patientContext.close();
+});

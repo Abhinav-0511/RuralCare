@@ -131,6 +131,7 @@ When a patient logs in for the first time on a phone with guest checks, the app 
 - **No self sign-up.** No public endpoint can create an account; `POST /api/auth/register` returns `410`. A test posts a would-be account to every unauthenticated endpoint and checks that no user appears.
 - **Patients are registered by their health worker,** and only in the health worker's own villages. The patient login's role is fixed to `patient` by the server.
 - **Roles are set only by an admin** (`/api/users`, admin-only). Patient accounts can't be turned into staff accounts.
+- **Villages are deactivated, never deleted,** so no patient, session or vitals history can disappear with a village. A village can't be deactivated while active staff still serve it, which avoids leaving those staff without access to their patients.
 - **Duplicate patients:** registering a phone number that another patient already has gives a warning (`DUPLICATE_PHONE`). The health worker can still register a different person with the same number (a shared family phone is common). A phone number can belong to only one login.
 
 ### 6.4 Passwords

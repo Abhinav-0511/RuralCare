@@ -183,9 +183,20 @@ export const VillageSchema = z
     district: z.string(),
     state: z.string(),
     location: z.object({ lat: z.number(), lng: z.number() }).optional(),
+    isActive: z.boolean().optional().meta({
+      description: 'false: deactivated (no new registrations or staff assignments; data kept)',
+    }),
     ...timestamps,
   })
   .meta({ id: 'Village' });
+
+export const ListVillagesQuerySchema = z.object({
+  active: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => v === 'true')
+    .meta({ description: '`true`: only active villages (for registration forms)' }),
+});
 
 export const CreateVillageBodySchema = z
   .object({
@@ -202,6 +213,10 @@ export const UpdateVillageBodySchema = z
     district: z.string().trim().min(2).max(100).optional(),
     state: z.string().trim().min(2).max(100).optional(),
     location: z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }).optional(),
+    isActive: z.boolean().optional().meta({
+      description:
+        'false deactivates (409 VILLAGE_HAS_STAFF while active staff are assigned); true reactivates',
+    }),
   })
   .refine((b) => Object.keys(b).length > 0, 'Provide at least one field to update')
   .meta({ id: 'UpdateVillageBody' });
@@ -241,6 +256,13 @@ export const CreatePatientBodySchema = z
     path: ['phone'],
   })
   .meta({ id: 'CreatePatientBody' });
+
+export const CreatePatientLoginBodySchema = z
+  .object({
+    phone: PhoneSchema.optional().meta({ description: 'Needed only if the patient record has no phone yet' }),
+    preferredLanguage: z.enum(LOCALES).optional(),
+  })
+  .meta({ id: 'CreatePatientLoginBody' });
 
 export const CreatedPatientSchema = PatientSchema.extend({
   login: TemporaryLoginSchema.optional(),
