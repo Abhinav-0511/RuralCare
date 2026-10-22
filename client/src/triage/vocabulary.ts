@@ -1,93 +1,43 @@
 // Body areas, symptom icons and search for the triage wizard (low-literacy friendly).
 import { type Locale, symptomVocabulary } from '@ruralcare/shared';
+import type { IconName } from '../components/Icon';
 import type { StringKey } from '../i18n/strings';
 
 export interface BodyArea {
   id: string;
   label: StringKey;
-  icon: string;
+  icon: IconName;
   categories: string[];
 }
 
 export const BODY_AREAS: BodyArea[] = [
-  { id: 'danger', label: 'area.danger', icon: '🚨', categories: ['emergency'] },
-  { id: 'head', label: 'area.head', icon: '🧠', categories: ['neuro', 'eyes', 'mood'] },
-  { id: 'chest', label: 'area.chest', icon: '🫁', categories: ['respiratory'] },
-  { id: 'stomach', label: 'area.stomach', icon: '🍽️', categories: ['digestive'] },
-  { id: 'skin', label: 'area.skin', icon: '🖐️', categories: ['skin'] },
-  { id: 'urine', label: 'area.urine', icon: '🚻', categories: ['urinary'] },
-  { id: 'body', label: 'area.body', icon: '🌡️', categories: ['general', 'pain'] },
-  { id: 'women', label: 'area.women', icon: '🤰', categories: ['womens_health'] },
-  { id: 'history', label: 'area.history', icon: '📋', categories: ['history'] },
+  { id: 'danger', label: 'area.danger', icon: 'alert', categories: ['emergency'] },
+  { id: 'head', label: 'area.head', icon: 'face', categories: ['neuro', 'eyes', 'mood'] },
+  { id: 'chest', label: 'area.chest', icon: 'wind', categories: ['respiratory'] },
+  { id: 'stomach', label: 'area.stomach', icon: 'utensils', categories: ['digestive'] },
+  { id: 'skin', label: 'area.skin', icon: 'hand', categories: ['skin'] },
+  { id: 'urine', label: 'area.urine', icon: 'droplet', categories: ['urinary'] },
+  { id: 'body', label: 'area.body', icon: 'thermometer', categories: ['general', 'pain'] },
+  { id: 'women', label: 'area.women', icon: 'female', categories: ['womens_health'] },
+  { id: 'history', label: 'area.history', icon: 'clipboard', categories: ['history'] },
 ];
 
-const CATEGORY_ICON: Record<string, string> = {
-  emergency: '🚨',
-  general: '🌡️',
-  respiratory: '🫁',
-  digestive: '🍽️',
-  pain: '🤕',
-  skin: '🖐️',
-  urinary: '🚻',
-  neuro: '🧠',
-  eyes: '👁️',
-  mood: '😟',
-  womens_health: '🤰',
-  history: '📋',
+const CATEGORY_ICON: Record<string, IconName> = {
+  emergency: 'alert',
+  general: 'thermometer',
+  respiratory: 'wind',
+  digestive: 'utensils',
+  pain: 'zap',
+  skin: 'hand',
+  urinary: 'droplet',
+  neuro: 'activity',
+  eyes: 'eye',
+  mood: 'frown',
+  womens_health: 'female',
+  history: 'clipboard',
 };
 
-const SYMPTOM_ICON: Record<string, string> = {
-  chest_pain: '💔',
-  breathlessness: '😮‍💨',
-  unconscious: '😵',
-  coma: '😵',
-  severe_bleeding: '🩸',
-  vomiting_blood: '🩸',
-  stomach_bleeding: '🩸',
-  blood_in_sputum: '🩸',
-  vaginal_bleeding: '🩸',
-  seizure: '⚡',
-  face_drooping: '😶',
-  slurred_speech: '🗣️',
-  weakness_of_one_body_side: '🦾',
-  altered_sensorium: '😵‍💫',
-  high_fever: '🔥',
-  mild_fever: '🌡️',
-  chills: '🥶',
-  shivering: '🥶',
-  cough: '😷',
-  runny_nose: '🤧',
-  continuous_sneezing: '🤧',
-  congestion: '🤧',
-  headache: '🤕',
-  dizziness: '😵‍💫',
-  vomiting: '🤮',
-  nausea: '🤢',
-  diarrhoea: '🚽',
-  constipation: '🚽',
-  abdominal_pain: '🤰',
-  stomach_pain: '🤰',
-  back_pain: '🧍',
-  joint_pain: '🦴',
-  knee_pain: '🦵',
-  muscle_pain: '💪',
-  skin_rash: '🔴',
-  itching: '🖐️',
-  fatigue: '😴',
-  lethargy: '😴',
-  sweating: '💦',
-  dehydration: '💧',
-  yellowish_skin: '🟡',
-  yellowing_of_eyes: '🟡',
-  dark_urine: '🟤',
-  burning_micturition: '🔥',
-  weight_loss: '⚖️',
-  loss_of_appetite: '🍽️',
-  redness_of_eyes: '👁️',
-  blurred_and_distorted_vision: '👓',
-};
-
-export const iconFor = (id: string, category: string) => SYMPTOM_ICON[id] ?? CATEGORY_ICON[category] ?? '•';
+export const iconFor = (category: string): IconName => CATEGORY_ICON[category] ?? 'activity';
 
 export const symptomsById = new Map(symptomVocabulary.symptoms.map((s) => [s.id, s]));
 

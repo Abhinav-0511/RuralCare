@@ -1,7 +1,8 @@
 import { SEXES, type Severity, type Sex, TriageInputSchema, type Vitals } from '@ruralcare/shared';
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { Button, ErrorBox } from '../components/ui';
+import { Icon, type IconName } from '../components/Icon';
+import { Button, ErrorBox, Notice } from '../components/ui';
 import { useI18n } from '../i18n/I18nProvider';
 import type { StringKey } from '../i18n/strings';
 import { useAuth } from '../lib/auth';
@@ -12,6 +13,7 @@ import { submitGuestTriage } from '../triage/guest';
 import { submitTriage } from '../triage/submit';
 import {
   BODY_AREAS,
+  DANGER_SYMPTOMS,
   DURATIONS,
   iconFor,
   searchSymptoms,
@@ -62,24 +64,79 @@ function Choice({
   onClick,
   children,
   testId,
+  tone = 'default',
+  className = '',
 }: {
   selected: boolean;
   onClick: () => void;
   children: React.ReactNode;
   testId?: string;
+  tone?: 'default' | 'danger';
+  className?: string;
 }) {
+  const danger = tone === 'danger';
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={selected}
       data-testid={testId}
-      className={`flex min-h-14 w-full items-center gap-3 rounded-xl border-2 px-3 py-2 text-left text-base ${
-        selected ? 'border-teal-700 bg-teal-50 font-semibold' : 'border-slate-200 bg-white'
-      }`}
+      className={`flex min-h-14 w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-base transition-colors ${
+        selected
+          ? danger
+            ? 'border-red-600 bg-red-50 font-semibold text-red-950 ring-1 ring-red-600'
+            : 'border-brand-700 bg-brand-50 font-semibold text-brand-950 ring-1 ring-brand-700'
+          : danger
+            ? 'border-red-200 bg-white hover:border-red-400'
+            : 'border-stone-200 bg-white hover:border-stone-400'
+      } ${className}`}
     >
       {children}
+      <span
+        className={`ml-auto flex size-5 shrink-0 items-center justify-center rounded-full border transition-colors ${
+          selected
+            ? danger
+              ? 'border-red-600 bg-red-600 text-white'
+              : 'border-brand-700 bg-brand-700 text-white'
+            : 'border-stone-300 text-transparent'
+        }`}
+        aria-hidden
+      >
+        <Icon name="check" className="size-3.5" strokeWidth={3} />
+      </span>
     </button>
+  );
+}
+
+/** Rounded icon tile at the start of a choice. */
+function ChoiceIcon({ name, tone = 'default' }: { name: IconName; tone?: 'default' | 'danger' }) {
+  return (
+    <span
+      className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${
+        tone === 'danger' ? 'bg-red-50 text-red-700' : 'bg-brand-50 text-brand-700'
+      }`}
+    >
+      <Icon name={name} className="size-[1.375rem]" />
+    </span>
+  );
+}
+
+/** Severity as a three-bar meter rather than faces. */
+function SeverityMeter({ level }: { level: 1 | 2 | 3 }) {
+  const colour = ['bg-amber-500', 'bg-orange-600', 'bg-red-700'][level - 1];
+  return (
+    <span
+      className="flex h-10 w-10 shrink-0 items-end justify-center gap-1 rounded-lg bg-stone-100 pb-2.5"
+      aria-hidden
+    >
+      {[1, 2, 3].map((i) => (
+        <span
+          key={i}
+          className={`w-1.5 rounded-sm ${i <= level ? colour : 'bg-stone-300'}`}
+          style={{ height: `${6 + i * 5}px` }}
+        />
+      ))}
+    </span>
   );
 }
 
@@ -102,8 +159,14 @@ function VoiceButton({ onText }: { onText: (text: string) => void }) {
     rec.start();
   };
   return (
-    <Button variant="secondary" onClick={start} aria-label={t('wizard.symptoms.voice')}>
-      🎤 {listening ? t('wizard.symptoms.listening') : t('wizard.symptoms.voice')}
+    <Button
+      variant="secondary"
+      onClick={start}
+      aria-label={t('wizard.symptoms.voice')}
+      className={listening ? 'border-red-400 text-red-700' : ''}
+    >
+      <Icon name="mic" className={`size-5 ${listening ? 'animate-pulse' : ''}`} />
+      {listening ? t('wizard.symptoms.listening') : t('wizard.symptoms.voice')}
     </Button>
   );
 }
@@ -261,31 +324,59 @@ export default function TriageWizard({ guest = false }: { guest?: boolean }) {
     review: 'wizard.review.title',
   };
 
+  const dangerIds = new Set(DANGER_SYMPTOMS.map((s) => s.id));
+  const isDanger = (id: string) => dangerIds.has(id);
+  const renderSymptom = (s: (typeof listed)[number]) => {
+    const tone = isDanger(s.id) ? 'danger' : 'default';
+    return (
+      <Choice
+        key={s.id}
+        testId={`symptom-${s.id}`}
+        tone={tone}
+        selected={draft.symptoms.includes(s.id)}
+        onClick={() => toggleSymptom(s.id)}
+      >
+        <ChoiceIcon name={iconFor(s.category)} tone={tone} />
+        <span>{loc(s.label)}</span>
+      </Choice>
+    );
+  };
+  const inputClass =
+    'min-h-12 w-full rounded-lg border border-stone-300 px-3 text-lg aria-[invalid=true]:border-red-600';
+
   return (
-    <div className="space-y-4" data-testid={`wizard-step-${step}`}>
+    <div className="space-y-5" data-testid={`wizard-step-${step}`}>
       <div>
-        <p className="text-sm text-slate-600">
+        <p className="text-sm font-medium text-stone-500">
           {t('wizard.step', { n: stepIndex + 1, total: steps.length })}
         </p>
-        <div className="mt-1 h-2 rounded bg-slate-200" aria-hidden>
-          <div
-            className="h-2 rounded bg-teal-600"
-            style={{ width: `${((stepIndex + 1) / steps.length) * 100}%` }}
-          />
+        <div className="mt-2 flex gap-1" aria-hidden>
+          {steps.map((s, i) => (
+            <span
+              key={s}
+              className={`h-1.5 flex-1 rounded-full transition-colors ${i <= stepIndex ? 'bg-brand-700' : 'bg-stone-200'}`}
+            />
+          ))}
         </div>
-        <h1 className="mt-3 text-2xl font-bold">{t(titleKey[step])}</h1>
+        <h1 className="mt-4 text-2xl font-bold text-stone-900">{t(titleKey[step])}</h1>
       </div>
 
       {step === 'patient' && (
         <div className="space-y-2">
-          <input
-            type="search"
-            placeholder={t('wizard.patient.search')}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="min-h-12 w-full rounded-xl border border-slate-300 px-3 text-lg"
-          />
-          {!online && <p className="text-sm text-slate-600">{t('wizard.patient.cached')}</p>}
+          <div className="relative">
+            <Icon
+              name="search"
+              className="pointer-events-none absolute top-1/2 left-3 size-5 -translate-y-1/2 text-stone-400"
+            />
+            <input
+              type="search"
+              placeholder={t('wizard.patient.search')}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className={`${inputClass} pl-10`}
+            />
+          </div>
+          {!online && <p className="text-sm text-stone-600">{t('wizard.patient.cached')}</p>}
           {patients
             .filter((p) => p.name.toLowerCase().includes(query.toLowerCase()))
             .map((p) => (
@@ -295,83 +386,93 @@ export default function TriageWizard({ guest = false }: { guest?: boolean }) {
                 onClick={() => choosePatient(p.id)}
                 testId="patient-option"
               >
-                <span className="text-2xl" aria-hidden>
-                  {p.sex === 'female' ? '👩' : p.sex === 'male' ? '👨' : '🧑'}
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-stone-100 text-sm font-semibold text-stone-700">
+                  {initials(p.name)}
                 </span>
                 <span>
                   {p.name}
-                  <span className="block text-sm font-normal text-slate-600">
+                  <span className="block text-sm font-normal text-stone-600">
                     {t('patient.years', { n: Math.floor(p.ageMonths / 12) })}
                   </span>
                 </span>
               </Choice>
             ))}
-          {patients.length === 0 && <p>{t('wizard.patient.none')}</p>}
+          {patients.length === 0 && <p className="text-stone-600">{t('wizard.patient.none')}</p>}
         </div>
       )}
 
       {step === 'area' && (
-        <div className="space-y-2">
-          <p className="text-slate-600">{t('wizard.area.hint')}</p>
+        <div className="space-y-3">
+          <p className="text-stone-600">{t('wizard.area.hint')}</p>
           <div className="grid grid-cols-2 gap-2">
-            {BODY_AREAS.map((a) => (
-              <Choice
-                key={a.id}
-                testId={`area-${a.id}`}
-                selected={draft.areas.includes(a.id)}
-                onClick={() =>
-                  update({
-                    areas: draft.areas.includes(a.id)
-                      ? draft.areas.filter((x) => x !== a.id)
-                      : [...draft.areas, a.id],
-                  })
-                }
-              >
-                <span className="text-3xl" aria-hidden>
-                  {a.icon}
-                </span>
-                <span>{t(a.label)}</span>
-              </Choice>
-            ))}
+            {BODY_AREAS.map((a) => {
+              const tone = a.id === 'danger' ? 'danger' : 'default';
+              return (
+                <Choice
+                  key={a.id}
+                  testId={`area-${a.id}`}
+                  tone={tone}
+                  className={a.id === 'danger' ? 'col-span-2' : ''}
+                  selected={draft.areas.includes(a.id)}
+                  onClick={() =>
+                    update({
+                      areas: draft.areas.includes(a.id)
+                        ? draft.areas.filter((x) => x !== a.id)
+                        : [...draft.areas, a.id],
+                    })
+                  }
+                >
+                  <ChoiceIcon name={a.icon} tone={tone} />
+                  <span className="leading-tight">{t(a.label)}</span>
+                </Choice>
+              );
+            })}
           </div>
         </div>
       )}
 
       {step === 'symptoms' && (
-        <div className="space-y-2">
+        <div className="space-y-3">
           <div className="flex gap-2">
-            <input
-              type="search"
-              data-testid="symptom-search"
-              placeholder={t('wizard.symptoms.search')}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="min-h-12 min-w-0 flex-1 rounded-xl border border-slate-300 px-3 text-lg"
-            />
+            <div className="relative min-w-0 flex-1">
+              <Icon
+                name="search"
+                className="pointer-events-none absolute top-1/2 left-3 size-5 -translate-y-1/2 text-stone-400"
+              />
+              <input
+                type="search"
+                data-testid="symptom-search"
+                placeholder={t('wizard.symptoms.search')}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className={`${inputClass} pl-10`}
+              />
+            </div>
             <VoiceButton onText={setQuery} />
           </div>
-          <p className="text-sm text-slate-700">
+          <p className="text-sm font-medium text-stone-700">
             {t('wizard.symptoms.selected', { n: draft.symptoms.length })}
           </p>
-          {!query && (
-            <p className="rounded-xl bg-red-50 p-2 text-sm text-red-900">{t('wizard.symptoms.danger')}</p>
+          {query && listed.length === 0 && <p className="text-stone-600">{t('wizard.symptoms.noMatch')}</p>}
+          {query ? (
+            <div className="space-y-2">{listed.map(renderSymptom)}</div>
+          ) : (
+            <>
+              {/* Danger signs stay first (same order as before), grouped so they aren't tapped by accident. */}
+              <section className="space-y-2 rounded-xl border border-red-200 bg-red-50/60 p-3">
+                <h2 className="flex items-center gap-2 font-semibold text-red-900">
+                  <Icon name="alert" className="size-5" />
+                  {t('wizard.symptoms.dangerTitle')}
+                </h2>
+                <p className="text-sm text-red-900">{t('wizard.symptoms.danger')}</p>
+                {listed.filter((s) => isDanger(s.id)).map(renderSymptom)}
+              </section>
+              <section className="space-y-2">
+                <h2 className="pt-1 font-semibold text-stone-800">{t('wizard.symptoms.other')}</h2>
+                {listed.filter((s) => !isDanger(s.id)).map(renderSymptom)}
+              </section>
+            </>
           )}
-          {query && listed.length === 0 && <p>{t('wizard.symptoms.noMatch')}</p>}
-          <div className="space-y-2">
-            {listed.map((s) => (
-              <Choice
-                key={s.id}
-                testId={`symptom-${s.id}`}
-                selected={draft.symptoms.includes(s.id)}
-                onClick={() => toggleSymptom(s.id)}
-              >
-                <span className="text-2xl" aria-hidden>
-                  {iconFor(s.id, s.category)}
-                </span>
-                <span>{loc(s.label)}</span>
-              </Choice>
-            ))}
-          </div>
         </div>
       )}
 
@@ -384,9 +485,7 @@ export default function TriageWizard({ guest = false }: { guest?: boolean }) {
               selected={draft.durationDays === d.days}
               onClick={() => update({ durationDays: d.days })}
             >
-              <span className="text-2xl" aria-hidden>
-                🗓️
-              </span>
+              <ChoiceIcon name="calendar" />
               {t(d.key)}
             </Choice>
           ))}
@@ -397,20 +496,18 @@ export default function TriageWizard({ guest = false }: { guest?: boolean }) {
         <div className="space-y-2">
           {(
             [
-              ['mild', '🙂'],
-              ['moderate', '😣'],
-              ['severe', '😫'],
+              ['mild', 1],
+              ['moderate', 2],
+              ['severe', 3],
             ] as const
-          ).map(([s, icon]) => (
+          ).map(([s, bars]) => (
             <Choice
               key={s}
               testId={`severity-${s}`}
               selected={draft.severity === s}
               onClick={() => update({ severity: s })}
             >
-              <span className="text-3xl" aria-hidden>
-                {icon}
-              </span>
+              <SeverityMeter level={bars} />
               {t(`severity.${s}`)}
             </Choice>
           ))}
@@ -418,9 +515,9 @@ export default function TriageWizard({ guest = false }: { guest?: boolean }) {
       )}
 
       {step === 'person' && (
-        <div className="space-y-4">
+        <div className="space-y-5">
           <fieldset>
-            <legend className="mb-1 font-semibold">{t('wizard.age')} *</legend>
+            <legend className="mb-1.5 font-semibold">{t('wizard.age')} *</legend>
             <div className="flex gap-2">
               <label className="flex-1">
                 <input
@@ -431,9 +528,9 @@ export default function TriageWizard({ guest = false }: { guest?: boolean }) {
                   data-testid="age-years"
                   value={draft.ageYears}
                   onChange={(e) => update({ ageYears: e.target.value })}
-                  className="min-h-12 w-full rounded-xl border border-slate-300 px-3 text-lg"
+                  className={inputClass}
                 />
-                <span className="text-sm">{t('wizard.years')}</span>
+                <span className="mt-1 block text-sm text-stone-600">{t('wizard.years')}</span>
               </label>
               <label className="flex-1">
                 <input
@@ -444,14 +541,14 @@ export default function TriageWizard({ guest = false }: { guest?: boolean }) {
                   data-testid="age-months"
                   value={draft.ageMonths}
                   onChange={(e) => update({ ageMonths: e.target.value })}
-                  className="min-h-12 w-full rounded-xl border border-slate-300 px-3 text-lg"
+                  className={inputClass}
                 />
-                <span className="text-sm">{t('wizard.months')}</span>
+                <span className="mt-1 block text-sm text-stone-600">{t('wizard.months')}</span>
               </label>
             </div>
           </fieldset>
           <fieldset>
-            <legend className="mb-1 font-semibold">{t('wizard.sex')} *</legend>
+            <legend className="mb-1.5 font-semibold">{t('wizard.sex')} *</legend>
             <div className="grid grid-cols-3 gap-2">
               {SEXES.map((s) => (
                 <Choice
@@ -468,9 +565,12 @@ export default function TriageWizard({ guest = false }: { guest?: boolean }) {
           {askPregnancy && (
             <fieldset
               data-testid="pregnancy-question"
-              className="rounded-xl border-2 border-pink-300 bg-pink-50 p-3"
+              className="rounded-xl border border-pink-200 bg-pink-50/70 p-3"
             >
-              <legend className="px-1 text-lg font-semibold">🤰 {t('wizard.pregnant')}</legend>
+              <legend className="flex items-center gap-2 px-1 text-lg font-semibold">
+                <Icon name="female" className="size-5 text-pink-700" />
+                {t('wizard.pregnant')}
+              </legend>
               <div className="grid grid-cols-3 gap-2">
                 {(['yes', 'no', 'unsure'] as const).map((p) => (
                   <Choice
@@ -485,12 +585,14 @@ export default function TriageWizard({ guest = false }: { guest?: boolean }) {
               </div>
               {/* "Not sure" is not a confirmed pregnancy (no pregnancy red flag), so say it plainly here. */}
               {draft.pregnancy === 'unsure' && (
-                <p
+                <Notice
+                  tone="danger"
+                  icon="alert"
                   data-testid="pregnancy-unsure-advice"
-                  className="mt-3 rounded-xl bg-red-50 p-3 font-semibold text-red-900"
+                  className="mt-3 font-semibold"
                 >
-                  🩸 {t('wizard.pregnant.unsureAdvice')}
-                </p>
+                  {t('wizard.pregnant.unsureAdvice')}
+                </Notice>
               )}
             </fieldset>
           )}
@@ -499,11 +601,11 @@ export default function TriageWizard({ guest = false }: { guest?: boolean }) {
 
       {step === 'vitals' && (
         <div className="space-y-3">
-          <p className="text-slate-600">{t('wizard.vitals.hint')}</p>
+          <p className="text-stone-600">{t('wizard.vitals.hint')}</p>
           <div className="grid grid-cols-2 gap-3">
             {VITAL_FIELDS.map((f) => (
               <label key={f.key} className="block">
-                <span className="mb-1 block text-sm font-medium">{t(`vitals.${f.key}`)}</span>
+                <span className="mb-1 block text-sm font-medium text-stone-700">{t(`vitals.${f.key}`)}</span>
                 <input
                   type="number"
                   inputMode="decimal"
@@ -514,7 +616,7 @@ export default function TriageWizard({ guest = false }: { guest?: boolean }) {
                   value={draft.vitals[f.key] ?? ''}
                   onChange={(e) => update({ vitals: { ...draft.vitals, [f.key]: e.target.value } })}
                   aria-invalid={vitalError(f, draft.vitals[f.key])}
-                  className="min-h-12 w-full rounded-xl border border-slate-300 px-3 text-lg aria-[invalid=true]:border-red-600"
+                  className={inputClass}
                 />
               </label>
             ))}
@@ -523,35 +625,51 @@ export default function TriageWizard({ guest = false }: { guest?: boolean }) {
       )}
 
       {step === 'review' && (
-        <div className="space-y-2 rounded-2xl bg-white p-4" data-testid="review">
+        <div className="space-y-3 rounded-xl border border-stone-200 bg-white p-4" data-testid="review">
           {draft.patientName && (
             <p>
               <span className="font-semibold">{t('wizard.review.patient')}:</span> {draft.patientName}
             </p>
           )}
-          <p className="font-semibold">{t('wizard.review.symptoms')}:</p>
-          <ul className="list-disc pl-5">
-            {draft.symptoms.map((id) => (
-              <li key={id}>{loc(symptomsById.get(id)?.label)}</li>
-            ))}
-          </ul>
-          <p>
+          <div>
+            <p className="font-semibold">{t('wizard.review.symptoms')}:</p>
+            <ul className="mt-1.5 flex flex-wrap gap-1.5">
+              {draft.symptoms.map((id) => (
+                <li
+                  key={id}
+                  className={`rounded-md px-2.5 py-1 text-sm ${
+                    isDanger(id) ? 'bg-red-50 font-semibold text-red-900' : 'bg-stone-100 text-stone-800'
+                  }`}
+                >
+                  {loc(symptomsById.get(id)?.label)}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <p className="border-t border-stone-100 pt-3 text-stone-700">
             {t('wizard.age')}:{' '}
             {ageMonths !== undefined
               ? `${Math.floor(ageMonths / 12)} ${t('wizard.years')} ${ageMonths % 12} ${t('wizard.months')}`
               : '—'}
             {draft.sex ? ` · ${t(`sex.${draft.sex}`)}` : ''}
           </p>
-          {!online && <p className="rounded-xl bg-sky-50 p-2 text-sky-900">{t('wizard.review.offline')}</p>}
+          {!online && (
+            <Notice tone="info" icon="cloudOff">
+              {t('wizard.review.offline')}
+            </Notice>
+          )}
         </div>
       )}
 
       {error && <ErrorBox>{error}</ErrorBox>}
 
-      <div className="sticky bottom-20 flex gap-2 bg-slate-50 py-2">
+      <div
+        className={`sticky ${guest ? 'bottom-0' : 'bottom-20'} -mx-4 flex gap-2 border-t border-stone-200 bg-paper/95 px-4 py-3 backdrop-blur`}
+      >
         {stepIndex > 0 && (
           <Button variant="secondary" onClick={back} className="flex-1">
-            ← {t('wizard.back')}
+            <Icon name="arrowLeft" className="size-5" />
+            {t('wizard.back')}
           </Button>
         )}
         {(step === 'duration' || step === 'severity' || step === 'vitals') && (
@@ -570,10 +688,20 @@ export default function TriageWizard({ guest = false }: { guest?: boolean }) {
           </Button>
         ) : (
           <Button onClick={next} className="flex-1" data-testid="wizard-next">
-            {t('wizard.next')} →
+            {t('wizard.next')}
+            <Icon name="arrowRight" className="size-5" />
           </Button>
         )}
       </div>
     </div>
   );
 }
+
+const initials = (name: string) =>
+  name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase();

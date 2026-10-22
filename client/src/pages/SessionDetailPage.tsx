@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { ResultView } from '../components/ResultView';
 import { Button, Card, ErrorBox, formatDateTime, Spinner } from '../components/ui';
+import { Icon } from '../components/Icon';
 import { useI18n } from '../i18n/I18nProvider';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -53,8 +54,13 @@ export default function SessionDetailPage() {
 
   return (
     <div className="space-y-4">
-      <Link to={`/patients/${session.patientId}`} className="text-teal-800 underline">
-        👤 {t('wizard.review.patient')}
+      <Link
+        to={`/patients/${session.patientId}`}
+        className="inline-flex items-center gap-1.5 font-semibold text-brand-800 underline-offset-4 hover:underline"
+      >
+        <Icon name="user" className="size-4" />
+        {t('wizard.review.patient')}
+        <Icon name="chevronRight" className="size-4" />
       </Link>
       <ResultView
         level={session.result.level}
@@ -64,7 +70,7 @@ export default function SessionDetailPage() {
 
       <Card>
         <h2 className="font-semibold">{t('doctor.input')}</h2>
-        <p className="text-sm text-slate-600">{formatDateTime(session.occurredAt, locale)}</p>
+        <p className="text-sm text-stone-600">{formatDateTime(session.occurredAt, locale)}</p>
         <ul className="mt-2 list-disc pl-5">
           {session.input.symptoms.map((s) => (
             <li key={s}>{loc(symptomsById.get(s)?.label) || s}</li>
@@ -84,9 +90,9 @@ export default function SessionDetailPage() {
         <h2 className="font-semibold">{t('doctor.notes')}</h2>
         <ul className="mt-2 space-y-2" data-testid="notes">
           {session.review.notes.map((n) => (
-            <li key={n._id} className="rounded-lg bg-slate-50 p-2">
+            <li key={n._id} className="rounded-lg border-l-2 border-brand-300 bg-stone-50 p-2.5 pl-3">
               {n.text}
-              <span className="block text-xs text-slate-600">{formatDateTime(n.createdAt, locale)}</span>
+              <span className="block text-xs text-stone-600">{formatDateTime(n.createdAt, locale)}</span>
             </li>
           ))}
         </ul>
@@ -97,7 +103,7 @@ export default function SessionDetailPage() {
               onChange={(e) => setNote(e.target.value)}
               placeholder={t('doctor.notePlaceholder')}
               data-testid="note-input"
-              className="min-h-24 w-full rounded-xl border border-slate-300 p-3"
+              className="min-h-24 w-full rounded-lg border border-stone-300 p-3"
             />
             <div className="flex flex-wrap gap-2">
               <Button
@@ -116,8 +122,12 @@ export default function SessionDetailPage() {
                   {t('doctor.markReviewed')}
                 </Button>
               ) : (
-                <span data-testid="reviewed" className="self-center font-semibold text-emerald-800">
-                  ✓ {t('doctor.reviewed')}
+                <span
+                  data-testid="reviewed"
+                  className="inline-flex items-center gap-1.5 self-center font-semibold text-emerald-800"
+                >
+                  <Icon name="check" className="size-4" strokeWidth={2.4} />
+                  {t('doctor.reviewed')}
                 </span>
               )}
             </div>

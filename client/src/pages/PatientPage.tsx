@@ -12,7 +12,8 @@ import {
   YAxis,
 } from 'recharts';
 import { TempPasswordCard } from '../components/TempPasswordCard';
-import { Button, Card, ErrorBox, formatDateTime, LevelBadge, Spinner } from '../components/ui';
+import { Button, Card, ErrorBox, formatDateTime, LevelBadge, Notice, Spinner } from '../components/ui';
+import { Icon } from '../components/Icon';
 import { LOCALE_NAMES, useI18n } from '../i18n/I18nProvider';
 import type { StringKey } from '../i18n/strings';
 import { api, ApiError } from '../lib/api';
@@ -93,7 +94,7 @@ function LoginCard({ patient, onChanged }: { patient: PatientDto; onChanged: () 
       <h2 className="mb-2 font-semibold">{t('patient.login')}</h2>
       {!patient.userId ? (
         <div className="space-y-3" data-testid="create-login">
-          <p className="text-slate-600">{t('patient.noLogin')}</p>
+          <p className="text-stone-600">{t('patient.noLogin')}</p>
           {patient.phone ? (
             <p className="font-mono">{patient.phone}</p>
           ) : (
@@ -105,7 +106,7 @@ function LoginCard({ patient, onChanged }: { patient: PatientDto; onChanged: () 
                 inputMode="numeric"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="min-h-12 w-full rounded-xl border border-slate-300 px-3 text-lg"
+                className="min-h-12 w-full rounded-lg border border-stone-300 px-3 text-lg"
               />
             </label>
           )}
@@ -115,7 +116,7 @@ function LoginCard({ patient, onChanged }: { patient: PatientDto; onChanged: () 
               name="loginLanguage"
               value={language}
               onChange={(e) => setLanguage(e.target.value as (typeof LOCALES)[number])}
-              className="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-lg"
+              className="min-h-12 w-full rounded-lg border border-stone-300 bg-white px-3 text-lg"
             >
               {LOCALES.map((l) => (
                 <option key={l} value={l}>
@@ -129,7 +130,8 @@ function LoginCard({ patient, onChanged }: { patient: PatientDto; onChanged: () 
             disabled={!patient.phone && !phone.trim()}
             data-testid="create-login-button"
           >
-            🔑 {t('patient.createLogin')}
+            <Icon name="key" className="size-5" />
+            {t('patient.createLogin')}
           </Button>
           {error && <ErrorBox>{error}</ErrorBox>}
         </div>
@@ -138,7 +140,9 @@ function LoginCard({ patient, onChanged }: { patient: PatientDto; onChanged: () 
           <p className="font-mono">{patient.phone}</p>
           {confirming ? (
             <>
-              <p className="rounded-xl bg-amber-50 p-3 text-amber-900">{t('patient.resetConfirm')}</p>
+              <Notice tone="warning" icon="alert">
+                {t('patient.resetConfirm')}
+              </Notice>
               <div className="flex gap-2">
                 <Button variant="secondary" className="flex-1" onClick={() => setConfirming(false)}>
                   {t('common.cancel')}
@@ -171,7 +175,7 @@ const CHARTS: { vitals: AlertVital[]; label: StringKey; domain: [number, number]
   { vitals: ['temperatureC'], label: 'vitals.temperatureC', domain: [35, 42] },
   { vitals: ['systolicBp', 'diastolicBp'], label: 'vitals.systolicBp', domain: [40, 200] },
 ];
-const COLORS: Record<string, string> = { systolicBp: '#0f766e', diastolicBp: '#7c3aed' };
+const COLORS: Record<string, string> = { systolicBp: '#20604a', diastolicBp: '#7c3aed' };
 
 const SEVEN_DAYS = 7 * 24 * 3600 * 1000;
 
@@ -207,8 +211,8 @@ export default function PatientPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold">{patient.data.name}</h1>
-        <p className="text-slate-600">{t('patient.years', { n: Math.floor(patient.data.ageMonths / 12) })}</p>
+        <h1 className="text-2xl font-bold text-stone-900">{patient.data.name}</h1>
+        <p className="text-stone-600">{t('patient.years', { n: Math.floor(patient.data.ageMonths / 12) })}</p>
       </div>
 
       {(user?.role === 'health_worker' || user?.role === 'admin') && (
@@ -217,8 +221,8 @@ export default function PatientPage() {
 
       <Card>
         <h2 className="mb-2 font-semibold">{t('patient.vitals')}</h2>
-        {vitals.data && points.length === 0 && <p className="text-slate-600">{t('patient.noVitals')}</p>}
-        {vitals.error && <p className="text-slate-600">{vitals.error}</p>}
+        {vitals.data && points.length === 0 && <p className="text-stone-600">{t('patient.noVitals')}</p>}
+        {vitals.error && <p className="text-stone-600">{vitals.error}</p>}
         {points.length > 0 &&
           CHARTS.map((c) => (
             <figure key={c.label} className="mb-4" data-testid={`chart-${c.vitals[0]}`}>
@@ -228,7 +232,7 @@ export default function PatientPage() {
               <div className="h-44 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={points} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" />
                     <XAxis dataKey="label" tick={{ fontSize: 10 }} minTickGap={24} />
                     <YAxis domain={c.domain} tick={{ fontSize: 10 }} allowDataOverflow />
                     <Tooltip />
@@ -237,7 +241,7 @@ export default function PatientPage() {
                         key={v}
                         type="monotone"
                         dataKey={v}
-                        stroke={COLORS[v] ?? '#0f766e'}
+                        stroke={COLORS[v] ?? '#20604a'}
                         dot={false}
                         connectNulls
                         isAnimationActive={false}
@@ -270,7 +274,10 @@ export default function PatientPage() {
         <ul>
           {sessions.data?.items.map((s) => (
             <li key={s.id}>
-              <Link to={`/sessions/${s.id}`} className="flex min-h-12 items-center justify-between">
+              <Link
+                to={`/sessions/${s.id}`}
+                className="flex min-h-12 items-center justify-between gap-2 border-b border-stone-100 text-sm"
+              >
                 {formatDateTime(s.occurredAt, locale)} <LevelBadge level={s.result.level} small />
               </Link>
             </li>

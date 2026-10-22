@@ -5,7 +5,7 @@ import { useOnline } from '../lib/connectivity';
 import { db } from '../lib/db';
 import { useLiveQuery } from '../lib/hooks';
 import { claimGuestChecks, guestPromptAnswered, markGuestPromptAnswered } from '../triage/guest';
-import { Button, Card, LevelBadge, formatDateTime } from './ui';
+import { Button, Card, LevelBadge, Notice, formatDateTime } from './ui';
 
 /**
  * Shown once to a patient who logs in on a phone that has guest checks on it: "You have N
@@ -23,13 +23,9 @@ export function GuestClaimPrompt() {
   if (!user?.patientId || user.mustChangePassword) return null;
   if (typeof status === 'object') {
     return (
-      <p
-        role="status"
-        data-testid="claim-done"
-        className="mb-4 rounded-xl bg-emerald-50 p-3 text-emerald-900"
-      >
-        ✓ {t('claim.done', { n: status.added })}
-      </p>
+      <Notice tone="success" icon="check" role="status" data-testid="claim-done" className="mb-4">
+        {t('claim.done', { n: status.added })}
+      </Notice>
     );
   }
   if (answered || checks.length === 0 || !online) return null;
@@ -50,21 +46,21 @@ export function GuestClaimPrompt() {
   };
 
   return (
-    <Card className="mb-4 border-2 border-teal-700">
+    <Card className="mb-4 border-brand-200 bg-brand-50/50">
       <section data-testid="claim-prompt" data-count={checks.length} className="space-y-3">
         <p className="text-lg font-semibold">{t('claim.question', { n: checks.length })}</p>
-        <p className="text-sm text-slate-600">{t('claim.hint')}</p>
-        <ul className="space-y-1">
+        <p className="text-sm text-stone-600">{t('claim.hint')}</p>
+        <ul className="divide-y divide-stone-100 rounded-lg border border-stone-200 bg-white px-3">
           {checks.map((c) => (
-            <li key={c.clientId} className="flex items-center justify-between gap-2 text-sm">
+            <li key={c.clientId} className="flex min-h-10 items-center justify-between gap-2 text-sm">
               {formatDateTime(c.createdAt, locale)} <LevelBadge level={c.level} small />
             </li>
           ))}
         </ul>
         {status === 'failed' && (
-          <p role="alert" className="rounded-xl bg-amber-50 p-3 text-amber-900">
+          <Notice tone="warning" icon="alert" role="alert">
             {t('claim.failed')}
-          </p>
+          </Notice>
         )}
         <div className="flex gap-2">
           <Button

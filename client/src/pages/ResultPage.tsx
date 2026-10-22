@@ -2,6 +2,7 @@ import { getTriageLevel } from '@ruralcare/shared';
 import { Link, useParams } from 'react-router';
 import { ResultView } from '../components/ResultView';
 import { Button, LevelBadge, Spinner } from '../components/ui';
+import { Icon } from '../components/Icon';
 import { useI18n } from '../i18n/I18nProvider';
 import { db, type LocalSession } from '../lib/db';
 import { useLiveQuery } from '../lib/hooks';
@@ -25,7 +26,7 @@ export default function ResultPage() {
         <section
           role="alert"
           data-testid="verdict-changed"
-          className="space-y-2 rounded-2xl border-4 border-red-700 bg-red-50 p-4"
+          className="space-y-2 rounded-xl border-2 border-red-700 bg-red-50 p-4"
         >
           <p className="font-semibold text-red-900">
             {t('result.differs', { level: loc(getTriageLevel(session.serverLevel!).title) })}
@@ -42,7 +43,12 @@ export default function ResultPage() {
           )}
         </section>
       )}
-      {session.patientName && <p className="text-lg font-semibold">{session.patientName}</p>}
+      {session.patientName && (
+        <p className="flex items-center gap-2 text-lg font-semibold">
+          <Icon name="user" className="size-5 text-stone-500" />
+          {session.patientName}
+        </p>
+      )}
       <ResultView
         level={session.level}
         guidance={session.guidance}

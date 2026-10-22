@@ -7,14 +7,14 @@ export function PasswordField(props: {
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block font-medium">{props.label}</span>
+      <span className="mb-1 block text-sm font-semibold text-stone-700">{props.label}</span>
       <input
         name={props.name}
         type="password"
         autoComplete={props.autoComplete}
         value={props.value}
         onChange={(e) => props.onChange(e.target.value)}
-        className="min-h-12 w-full rounded-xl border border-slate-300 px-3 text-lg"
+        className="min-h-12 w-full rounded-lg border border-stone-300 px-3 text-lg"
         required
       />
     </label>
