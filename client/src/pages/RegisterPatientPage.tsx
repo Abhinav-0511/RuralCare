@@ -2,7 +2,7 @@ import { LOCALES, SEXES, type Sex } from '@ruralcare/shared';
 import { type FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { TempPasswordCard } from '../components/TempPasswordCard';
-import { Button, Card, ErrorBox, Spinner } from '../components/ui';
+import { Notice, Button, Card, ErrorBox, Spinner } from '../components/ui';
 import { LOCALE_NAMES, useI18n } from '../i18n/I18nProvider';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -94,9 +94,9 @@ export default function RegisterPatientPage() {
   if (created?.login) {
     return (
       <div className="space-y-4">
-        <p role="status" className="rounded-xl bg-emerald-50 p-3 text-emerald-900">
-          ✓ {t('reg.done', { name: created.name })}
-        </p>
+        <Notice tone="success" icon="check" role="status">
+          {t('reg.done', { name: created.name })}
+        </Notice>
         <TempPasswordCard
           phone={created.login.phone}
           password={created.login.temporaryPassword}
@@ -106,7 +106,7 @@ export default function RegisterPatientPage() {
     );
   }
 
-  const field = 'min-h-12 w-full rounded-xl border border-slate-300 px-3 text-lg';
+  const field = 'min-h-12 w-full rounded-lg border border-stone-300 px-3 text-lg';
   const label = 'mb-1 block font-medium';
   return (
     <Card>
@@ -175,7 +175,7 @@ export default function RegisterPatientPage() {
             className={field}
           />
         </label>
-        <label className="flex min-h-12 items-start gap-3 rounded-xl bg-slate-50 p-3">
+        <label className="flex min-h-12 items-start gap-3 rounded-xl bg-stone-50 p-3">
           <input
             type="checkbox"
             name="createLogin"
@@ -185,7 +185,7 @@ export default function RegisterPatientPage() {
           />
           <span>
             <span className="block font-medium">{t('reg.createLogin')}</span>
-            <span className="block text-sm text-slate-600">{t('reg.createLoginHint')}</span>
+            <span className="block text-sm text-stone-600">{t('reg.createLoginHint')}</span>
           </span>
         </label>
         {form.createLogin && (

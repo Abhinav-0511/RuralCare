@@ -1,6 +1,6 @@
 import { Link, useParams } from 'react-router';
 import { ResultView } from '../components/ResultView';
-import { Button, Spinner } from '../components/ui';
+import { Button, Notice, Spinner } from '../components/ui';
 import { useI18n } from '../i18n/I18nProvider';
 import { db, type GuestCheck } from '../lib/db';
 import { useLiveQuery } from '../lib/hooks';
@@ -20,17 +20,19 @@ export default function GuestResultPage() {
 
   return (
     <div className="space-y-4">
-      <p
+      <Notice
+        tone="neutral"
+        icon="smartphone"
         data-testid="guest-not-saved"
-        className="rounded-xl border-2 border-slate-400 bg-white p-3 font-semibold text-slate-800"
+        className="bg-white font-semibold text-stone-800"
       >
-        📵 {t('guest.notSaved')}
-        <span className="block text-sm font-normal text-slate-600">{t('guest.notSavedDetail')}</span>
-      </p>
+        {t('guest.notSaved')}
+        <span className="block text-sm font-normal text-stone-600">{t('guest.notSavedDetail')}</span>
+      </Notice>
       <ResultView level={check.level} guidance={check.guidance} source={check.source} />
-      <p data-testid="guest-register-hint" className="rounded-xl bg-teal-50 p-3 text-teal-900">
-        🏥 {t('guest.registerHint')}
-      </p>
+      <Notice tone="brand" icon="building" data-testid="guest-register-hint">
+        {t('guest.registerHint')}
+      </Notice>
       <Link to="/guest" className="block">
         <Button className="w-full">{t('guest.newCheck')}</Button>
       </Link>

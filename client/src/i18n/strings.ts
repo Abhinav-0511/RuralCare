@@ -95,6 +95,8 @@ export const strings = {
     ta: 'ஏதேனும் ஆபத்து அறிகுறி இருந்தால் தேர்வு செய்யவும்: அது அவசரமாகக் கருதப்படும்.',
     hi: 'कोई भी ख़तरे का संकेत हो तो चुनें: उसे आपातकाल माना जाएगा।',
   },
+  'wizard.symptoms.dangerTitle': { en: 'Danger signs', ta: 'ஆபத்து அறிகுறிகள்', hi: 'ख़तरे के संकेत' },
+  'wizard.symptoms.other': { en: 'Other symptoms', ta: 'மற்ற அறிகுறிகள்', hi: 'अन्य लक्षण' },
   'wizard.symptoms.required': {
     en: 'Choose at least one symptom',
     ta: 'குறைந்தது ஒரு அறிகுறியைத் தேர்வு செய்யவும்',

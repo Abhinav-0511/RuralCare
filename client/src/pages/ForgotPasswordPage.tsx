@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from 'react';
 import { Link } from 'react-router';
-import { Button, Card, ErrorBox } from '../components/ui';
+import { Button, Card, ErrorBox, Notice } from '../components/ui';
+import { LogoMark } from '../components/Icon';
 import { LanguageSwitch, useI18n } from '../i18n/I18nProvider';
 import { api, ApiError } from '../lib/api';
 import { useOnline } from '../lib/connectivity';
@@ -79,95 +80,109 @@ export default function ForgotPasswordPage() {
     }
   };
 
-  const input = 'min-h-12 w-full rounded-xl border border-slate-300 px-3 text-lg';
+  const input = 'min-h-12 w-full rounded-lg border border-stone-300 px-3 text-lg';
   return (
-    <main className="mx-auto min-h-dvh max-w-md bg-teal-800 px-4 py-8">
-      <div className="mb-4 flex items-center justify-between text-white">
-        <h1 className="text-3xl font-bold">RuralCare</h1>
-        <LanguageSwitch />
-      </div>
-      <Card>
-        <div className="space-y-4" data-testid="forgot-password">
-          <h2 className="text-xl font-semibold">{t('forgot.title')}</h2>
-          {!online && <ErrorBox>{t('common.needsInternet')}</ErrorBox>}
-          {done ? (
-            <p
-              role="status"
-              data-testid="reset-done"
-              className="rounded-xl bg-emerald-50 p-3 text-emerald-900"
-            >
-              ✓ {t('forgot.done')}
-            </p>
-          ) : !sent ? (
-            <form onSubmit={requestCode} className="space-y-4">
-              <p className="text-slate-700">{t('forgot.hint')}</p>
-              <label className="block">
-                <span className="mb-1 block font-medium">{t('login.phone')}</span>
-                <input
-                  name="phone"
-                  type="tel"
-                  inputMode="numeric"
-                  autoComplete="username"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className={input}
-                  required
-                />
-              </label>
-              {error && <ErrorBox>{error}</ErrorBox>}
-              <Button type="submit" disabled={busy || !online} className="w-full" data-testid="send-code">
-                {t('forgot.send')}
-              </Button>
-            </form>
-          ) : (
-            <form onSubmit={confirm} className="space-y-4">
-              <p className="rounded-xl bg-sky-50 p-3 text-sky-900">
-                {t('forgot.sent', { min: sent.minutes })}
-              </p>
-              {sent.devOtp && (
-                <p data-testid="dev-otp" className="rounded-xl bg-amber-50 p-3 font-mono text-amber-900">
-                  {t('forgot.devCode', { code: sent.devOtp })}
-                </p>
-              )}
-              <label className="block">
-                <span className="mb-1 block font-medium">{t('forgot.code')}</span>
-                <input
-                  name="otp"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  maxLength={6}
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                  className={`${input} tracking-widest`}
-                  required
-                />
-              </label>
-              <PasswordField
-                name="newPassword"
-                label={t('pw.new')}
-                value={next}
-                onChange={setNext}
-                autoComplete="new-password"
-              />
-              <PasswordField
-                name="repeatPassword"
-                label={t('pw.repeat')}
-                value={repeat}
-                onChange={setRepeat}
-                autoComplete="new-password"
-              />
-              {error && <ErrorBox>{error}</ErrorBox>}
-              <Button type="submit" disabled={busy || !online} className="w-full" data-testid="confirm-reset">
-                {t('forgot.confirm')}
-              </Button>
-            </form>
-          )}
-          <p className="text-sm text-slate-600">{t('forgot.noPhone')}</p>
-          <Link to="/login" className="block text-center font-semibold text-teal-800 underline">
-            {t('forgot.back')}
-          </Link>
+    <div className="min-h-dvh bg-paper">
+      <div className="bg-brand-900 px-4 pt-[max(1.25rem,env(safe-area-inset-top))] pb-20 text-white">
+        <div className="mx-auto flex max-w-md items-center justify-between gap-3">
+          <span className="flex items-center gap-2">
+            <LogoMark className="size-9 text-brand-200" />
+            <h1 className="text-2xl font-bold tracking-tight">RuralCare</h1>
+          </span>
+          <LanguageSwitch />
         </div>
-      </Card>
-    </main>
+      </div>
+      <main className="mx-auto -mt-12 max-w-md px-4 pb-10">
+        <Card className="p-5 shadow-sm">
+          <div className="space-y-4" data-testid="forgot-password">
+            <h2 className="text-xl font-bold">{t('forgot.title')}</h2>
+            {!online && <ErrorBox>{t('common.needsInternet')}</ErrorBox>}
+            {done ? (
+              <Notice tone="success" icon="check" role="status" data-testid="reset-done">
+                {t('forgot.done')}
+              </Notice>
+            ) : !sent ? (
+              <form onSubmit={requestCode} className="space-y-4">
+                <p className="text-stone-700">{t('forgot.hint')}</p>
+                <label className="block">
+                  <span className="mb-1 block font-medium">{t('login.phone')}</span>
+                  <input
+                    name="phone"
+                    type="tel"
+                    inputMode="numeric"
+                    autoComplete="username"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className={input}
+                    required
+                  />
+                </label>
+                {error && <ErrorBox>{error}</ErrorBox>}
+                <Button type="submit" disabled={busy || !online} className="w-full" data-testid="send-code">
+                  {t('forgot.send')}
+                </Button>
+              </form>
+            ) : (
+              <form onSubmit={confirm} className="space-y-4">
+                <Notice tone="info" icon="smartphone">
+                  {t('forgot.sent', { min: sent.minutes })}
+                </Notice>
+                {sent.devOtp && (
+                  <p
+                    data-testid="dev-otp"
+                    className="rounded-lg border border-amber-200 bg-amber-50 p-3 font-mono text-amber-950"
+                  >
+                    {t('forgot.devCode', { code: sent.devOtp })}
+                  </p>
+                )}
+                <label className="block">
+                  <span className="mb-1 block font-medium">{t('forgot.code')}</span>
+                  <input
+                    name="otp"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                    className={`${input} tracking-widest`}
+                    required
+                  />
+                </label>
+                <PasswordField
+                  name="newPassword"
+                  label={t('pw.new')}
+                  value={next}
+                  onChange={setNext}
+                  autoComplete="new-password"
+                />
+                <PasswordField
+                  name="repeatPassword"
+                  label={t('pw.repeat')}
+                  value={repeat}
+                  onChange={setRepeat}
+                  autoComplete="new-password"
+                />
+                {error && <ErrorBox>{error}</ErrorBox>}
+                <Button
+                  type="submit"
+                  disabled={busy || !online}
+                  className="w-full"
+                  data-testid="confirm-reset"
+                >
+                  {t('forgot.confirm')}
+                </Button>
+              </form>
+            )}
+            <p className="text-sm text-stone-600">{t('forgot.noPhone')}</p>
+            <Link
+              to="/login"
+              className="block text-center text-sm font-semibold text-brand-800 underline-offset-4 hover:underline"
+            >
+              {t('forgot.back')}
+            </Link>
+          </div>
+        </Card>
+      </main>
+    </div>
   );
 }

@@ -41,9 +41,9 @@ export default function AdminPage() {
           [t('admin.pending'), s.pendingReview],
           [t('admin.fallback'), s.modelUnavailable],
         ].map(([label, value]) => (
-          <Card key={label as string} className="text-center">
-            <p className="text-3xl font-bold text-teal-800">{value}</p>
-            <p className="text-xs text-slate-600">{label}</p>
+          <Card key={label as string} className="p-3">
+            <p className="text-3xl font-bold text-stone-900 tabular-nums">{value}</p>
+            <p className="mt-1 text-xs leading-tight font-medium text-stone-500">{label}</p>
           </Card>
         ))}
       </div>

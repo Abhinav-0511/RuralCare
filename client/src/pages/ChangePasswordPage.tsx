@@ -46,7 +46,7 @@ export default function ChangePasswordPage() {
     <Card>
       <form onSubmit={submit} className="space-y-4" data-testid="change-password">
         <h1 className="text-xl font-semibold">{t('pw.title')}</h1>
-        {user?.mustChangePassword && <p className="text-slate-700">{t('pw.hint')}</p>}
+        {user?.mustChangePassword && <p className="text-stone-700">{t('pw.hint')}</p>}
         <PasswordField
           name="currentPassword"
           label={t('pw.current')}

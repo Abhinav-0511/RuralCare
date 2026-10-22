@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from 'react';
 import { TempPasswordCard } from '../components/TempPasswordCard';
-import { Button, Card, ErrorBox, Spinner } from '../components/ui';
+import { Button, Card, CardTitle, ErrorBox, Spinner } from '../components/ui';
+import { Icon } from '../components/Icon';
 import { useI18n } from '../i18n/I18nProvider';
 import type { StringKey } from '../i18n/strings';
 import { api, ApiError, type User } from '../lib/api';
@@ -19,7 +20,7 @@ type StaffRole = 'health_worker' | 'doctor' | 'admin';
 const STAFF_ROLES: StaffRole[] = ['health_worker', 'doctor', 'admin'];
 const roleKey = (r: StaffRole) => `role.${r}` as StringKey;
 
-const field = 'min-h-12 w-full rounded-xl border border-slate-300 px-3 text-lg';
+const field = 'min-h-12 w-full rounded-lg border border-stone-300 px-3 text-lg';
 const label = 'mb-1 block font-medium';
 
 function VillagePicker(props: { villages: Village[]; value: string[]; onChange: (ids: string[]) => void }) {
@@ -42,7 +43,7 @@ function VillagePicker(props: { villages: Village[]; value: string[]; onChange: 
                   )
                 }
               />
-              {v.name} <span className="text-sm text-slate-600">({v.district})</span>
+              {v.name} <span className="text-sm text-stone-600">({v.district})</span>
             </label>
           ))}
       </div>
@@ -140,7 +141,7 @@ function StaffForm(props: {
       {role === 'health_worker' && (
         <VillagePicker villages={props.villages} value={villageIds} onChange={setVillageIds} />
       )}
-      {!editing && <p className="text-sm text-slate-600">{t('admin.passwordHint')}</p>}
+      {!editing && <p className="text-sm text-stone-600">{t('admin.passwordHint')}</p>}
       {error && <ErrorBox>{error}</ErrorBox>}
       <div className="flex gap-2">
         <Button variant="secondary" className="flex-1" onClick={props.onCancel}>
@@ -200,7 +201,7 @@ function VillagesCard({ villages, reload }: { villages: Village[]; reload: () =>
   const form = (
     <form
       onSubmit={(e) => void save(e)}
-      className="space-y-3 rounded-xl bg-slate-50 p-3"
+      className="space-y-3 rounded-xl bg-stone-50 p-3"
       data-testid="village-form"
     >
       <label className="block">
@@ -239,8 +240,8 @@ function VillagesCard({ villages, reload }: { villages: Village[]; reload: () =>
 
   return (
     <Card>
-      <h2 className="mb-2 text-lg font-bold">🏘️ {t('admin.villages')}</h2>
-      <ul className="divide-y divide-slate-100" data-testid="villages-list">
+      <CardTitle icon="mapPin">{t('admin.villages')}</CardTitle>
+      <ul className="divide-y divide-stone-100" data-testid="villages-list">
         {villages.map((v) =>
           editing === v.id ? (
             <li key={v.id} className="py-2">
@@ -253,10 +254,10 @@ function VillagesCard({ villages, reload }: { villages: Village[]; reload: () =>
               data-testid="village-item"
               data-active={v.isActive !== false}
             >
-              <span className={v.isActive === false ? 'text-slate-400' : ''}>
-                {v.name} <span className="text-sm text-slate-600">({v.district})</span>
+              <span className={v.isActive === false ? 'text-stone-400' : ''}>
+                {v.name} <span className="text-sm text-stone-600">({v.district})</span>
                 {v.isActive === false && (
-                  <span className="ml-2 rounded-full bg-slate-200 px-2 py-0.5 text-xs text-slate-700">
+                  <span className="ml-2 rounded-md bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
                     {t('admin.inactive')}
                   </span>
                 )}
@@ -278,12 +279,13 @@ function VillagesCard({ villages, reload }: { villages: Village[]; reload: () =>
         )}
       </ul>
       {error && !editing && <ErrorBox>{error}</ErrorBox>}
-      <p className="mt-2 text-sm text-slate-600">{t('admin.villageDeactivateHint')}</p>
+      <p className="mt-2 text-sm text-stone-600">{t('admin.villageDeactivateHint')}</p>
       {editing === 'new' ? (
         <div className="mt-2">{form}</div>
       ) : (
         <Button variant="secondary" className="mt-2 w-full" onClick={() => open()} data-testid="add-village">
-          ➕ {t('admin.addVillage')}
+          <Icon name="plus" className="size-5" />
+          {t('admin.addVillage')}
         </Button>
       )}
     </Card>
@@ -335,7 +337,7 @@ export default function AdminUsersPage() {
       {temp && <TempPasswordCard phone={temp.phone} password={temp.password} onDone={() => setTemp(null)} />}
       {error && <ErrorBox>{error}</ErrorBox>}
       <Card>
-        <h2 className="mb-2 text-lg font-bold">👥 {t('admin.users')}</h2>
+        <CardTitle icon="users">{t('admin.users')}</CardTitle>
         {editing === 'new' ? (
           <StaffForm
             villages={villages.data}
@@ -348,10 +350,11 @@ export default function AdminUsersPage() {
           />
         ) : (
           <Button className="mb-3 w-full" onClick={() => setEditing('new')} data-testid="add-staff">
-            ➕ {t('admin.addUser')}
+            <Icon name="plus" className="size-5" />
+            {t('admin.addUser')}
           </Button>
         )}
-        <ul className="divide-y divide-slate-100" data-testid="staff-list">
+        <ul className="divide-y divide-stone-100" data-testid="staff-list">
           {staff.map((u) => (
             <li key={u.id} className="py-3" data-testid="staff-item">
               {editing === u.id ? (
@@ -368,17 +371,17 @@ export default function AdminUsersPage() {
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <span
-                      className={`font-semibold ${u.isActive === false ? 'text-slate-400 line-through' : ''}`}
+                      className={`font-semibold ${u.isActive === false ? 'text-stone-400 line-through' : ''}`}
                     >
                       {u.name}
                     </span>
-                    <span className="text-sm text-slate-600">
+                    <span className="text-sm text-stone-600">
                       {t(roleKey(u.role as StaffRole))} · {u.phone}
                       {u.isActive === false && ` · ${t('admin.inactive')}`}
                     </span>
                   </div>
                   {u.role === 'health_worker' && (
-                    <p className="text-sm text-slate-700">
+                    <p className="text-sm text-stone-700">
                       {u.villageIds.length
                         ? u.villageIds.map((id) => villageName.get(id) ?? id).join(', ')
                         : t('admin.noVillages')}

@@ -1,1 +1,51 @@
 @import 'tailwindcss';
+
+/*
+ * Design tokens. `brand` is a deep forest green; neutrals use Tailwind's warm `stone` scale on a
+ * paper-tinted background. System fonts only: nothing to download on a slow connection, and the
+ * phone's own Tamil / Devanagari fonts render those scripts.
+ */
+@theme {
+  --font-sans:
+    'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, Roboto, 'Noto Sans', 'Noto Sans Tamil',
+    'Noto Sans Devanagari', 'Helvetica Neue', Arial, sans-serif;
+
+  --color-paper: #f5f3ee;
+
+  --color-brand-50: #eef6f2;
+  --color-brand-100: #d6eadf;
+  --color-brand-200: #acd3bf;
+  --color-brand-300: #7bb69a;
+  --color-brand-400: #4c9475;
+  --color-brand-500: #2e785b;
+  --color-brand-600: #20604a;
+  --color-brand-700: #1a4f3d;
+  --color-brand-800: #153f32;
+  --color-brand-900: #0f3128;
+  --color-brand-950: #08201a;
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-paper text-stone-900 antialiased;
+  }
+  h1,
+  h2 {
+    letter-spacing: -0.01em;
+  }
+  :focus-visible {
+    outline: 3px solid var(--color-brand-400);
+    outline-offset: 2px;
+  }
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    @apply bg-white transition-colors placeholder:text-stone-400 focus:border-brand-600 focus:outline-none focus-visible:outline-none focus:ring-3 focus:ring-brand-600/15;
+  }
+  input[type='checkbox'] {
+    accent-color: var(--color-brand-700);
+  }
+}

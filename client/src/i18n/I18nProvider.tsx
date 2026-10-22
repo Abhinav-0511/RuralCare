@@ -69,11 +69,7 @@ export function useI18n(): I18n {
 export function LanguageSwitch() {
   const { locale, setLocale, t } = useI18n();
   return (
-    <div
-      role="group"
-      aria-label={t('nav.language')}
-      className="flex overflow-hidden rounded-lg border border-white/40"
-    >
+    <div role="group" aria-label={t('nav.language')} className="flex gap-0.5 rounded-lg bg-black/20 p-0.5">
       {LOCALES.map((l) => (
         <button
           key={l}
@@ -81,7 +77,7 @@ export function LanguageSwitch() {
           lang={l}
           onClick={() => setLocale(l)}
           aria-pressed={locale === l}
-          className={`min-h-10 px-2.5 text-sm ${locale === l ? 'bg-white font-semibold text-teal-800' : 'text-white'}`}
+          className={`min-h-9 rounded-md px-2.5 text-sm transition-colors ${locale === l ? 'bg-white font-semibold text-brand-900 shadow-sm' : 'text-brand-100 hover:bg-white/10 hover:text-white'}`}
         >
           {LOCALE_NAMES[l]}
         </button>
